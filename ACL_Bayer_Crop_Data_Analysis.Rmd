@@ -115,10 +115,19 @@ df_agribenchmark %>%
   filter(`Result year` == "2017") %>% 
   tabyl(Nation2) %>% 
   kable()
+
 ```
+
+
 
 ```{r,include=FALSE, message=FALSE, echo=FALSE}
 aux<-df_agribenchmark %>% 
+  mutate(Crop = if_else(Crop.level.2=='corn','corn',
+                        if_else(Crop.level.2=='soybeans','soybeans',
+                                if_else(Crop.level.2=='wheat','wheat',
+                                        if_else(Crop.level.2=='rapeseed','rapeseed',
+                                                if_else(Crop.level.1=='potato','potato',
+                                                        if_else(Crop.level.1=='rice','rice','other'))))))) %>%
   mutate(Crop2=ifelse(Crop=='rice','other',Crop)) %>%
   select(c('Result.year','Acreage','Crop2','Continent','Crop.yield','Gross.revenue',
            'Direct.cost', 'Labor','Machinery','Contractor','Diesel','Other.energy.cost',
@@ -2051,9 +2060,119 @@ ARMS_Sales_Variance_long %>%
 
 #Ideas for the next ACL Team
 ##Fertilizer and pesticide use per hectare by national wealth 
-```{r, include=FALSE, message=FALSE, echo=FALSE}
+
+It seems that there is a positive correlation between a nation's wealth (GDP/Pop) and the amount of fertilizer and pesticides that are put on crops on a per acre basis.  Bayer could use this relationship and combine it with the projections of GDP/population growth in different regions to make projections on which crops and corresponding products may grow the fastest over the next 1-2 decades.
 
 
+Look at wealth vs Fert/Acre
+
+
+```{r}
+df_wealth <- df_fao_data_crops
+
+df_2j_macro <- df_fao_data_macro
+
+df_2j_fert <- df_fao_data_fertilizers
+
+df_2j_pest <- df_fao_data_pesticides
+
+df_2j_pest <- df_2j_pest %>% 
+  mutate(ag_use = Import.Quantity - Export.Quantity)
+
+glimpse(df_2j_pest)
+
+df_3j_pest <- df_2j_pest %>%
+  group_by(Year,Area) %>%
+  summarize(total_pest = sum(ag_use, na.rm = TRUE))
+
+df_3j_pest %>%
+  filter(Year > 2000)
+
+df_2j_fert <- df_2j_fert %>%
+  group_by(Area, Year) %>%
+  summarize(sumFert = sum(Agricultural.Use, na.rm = TRUE))
+
+df_comb <- df_2j_macro %>%
+  left_join(df_2j_fert, by = c("Area","Year"))
+
+df_comb <- df_comb %>%
+  left_join(df_3j_pest, by = c("Area","Year"))
+
+
+```
+
+
+
+
+```{r}
+df_comb <- df_comb %>%
+  mutate(wealth = GDP/Population,
+         land_fert = sumFert/Cropland,
+         land_pest = total_pest/Cropland)
+
+
+library(Hmisc)
+
+
+df_comb %>%
+  filter(Year == 2017, land_fert > 0) %>%
+  ggplot(aes(x = land_fert)) + 
+  geom_histogram()
+
+df_comb %>%
+  filter(Year > 2005, land_fert > 0) %>%
+  ggplot(aes(x = log(wealth), y = log(Cropland))) +
+  geom_point() + 
+  facet_wrap(~Year) +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 5)) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Log Wealth (GDP/Pop)", y = "Log Cropland (Hectares)")
+
+df_comb %>%
+  filter(Year > 2005, land_fert > 0) %>%
+  ggplot(aes(x = log(wealth), y = log(land_fert))) +
+  geom_point() + 
+  facet_wrap(~Year) +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 5)) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Log Wealth (GDP/Pop)", y = "Log Fertilizer Use (Usage/Hectare)")
+
+df_comb %>%
+  filter(Year > 2005, land_pest > 0) %>%
+  ggplot(aes(x = log(wealth), y = log(land_pest))) +
+  geom_point() + 
+  facet_wrap(~Year) +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 5)) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Log Wealth (GDP/Pop)", y = "Log Pesticide Use (Usage/Hectare)")
+
+df_comb %>%
+  filter(Year %in% c(2011, 2012)) %>%
+  ggplot(aes(x = Year, y = log(land_fert), color = Area)) + 
+  geom_line() + 
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 5))
+
+library(dplyr)
+
+df_comb %>%
+  filter(Year %in% c(2011, 2012)) %>%
+  group_by(Area, Year) %>%
+  dplyr::summarize(total = land_fert)
+
+df_comb %>%
+  filter(Year == 2016, land_fert > 0) %>%
+  dplyr::summarize(totalcountries = n())
+
+df_comb %>%
+  filter(land_fert > 0) %>%
+  group_by(Year) %>%
+  dplyr::summarize(totalcountries = n()) %>%
+  ggplot(aes(x = Year, y = totalcountries)) +
+  geom_line()
 ```
 
 ##Network Analysis
@@ -2230,4 +2349,9 @@ ARMS_corn %>%
   select(incfi_lag1, endepr, efrent) %>% 
   corr.test()
 ```
+
+
+
+
+
 
