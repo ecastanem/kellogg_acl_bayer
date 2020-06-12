@@ -1,0 +1,458 @@
+year,category_value,category2_value,variable_id,estimate
+2003,Commercial farms,General Cash Grains,icrop,303825
+2003,Commercial farms,Corn,icrop,347894
+2003,Commercial farms,Soybean,icrop,NA
+2003,Commercial farms,Other Field Crops,icrop,81940
+2003,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2003,Commercial farms,Cattle,icrop,90333
+2003,Commercial farms,Poultry,icrop,64917
+2003,Commercial farms,Dairy,icrop,29736
+2003,Commercial farms,All other livestock,icrop,208186
+2003,Commercial farms,Hogs,icrop,104113
+2004,Commercial farms,Corn,icrop,356642
+2004,Commercial farms,Cattle,icrop,129002
+2004,Commercial farms,Hogs,icrop,204847
+2004,Commercial farms,General Cash Grains,icrop,255423
+2004,Commercial farms,Soybean,icrop,338122
+2004,Commercial farms,Other Field Crops,icrop,73560
+2004,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2004,Commercial farms,Poultry,icrop,40254
+2004,Commercial farms,Dairy,icrop,37606
+2004,Commercial farms,All other livestock,icrop,172825
+2005,Commercial farms,Corn,icrop,349464
+2005,Commercial farms,Other Field Crops,icrop,33236
+2005,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2005,Commercial farms,Cattle,icrop,233522
+2005,Commercial farms,Poultry,icrop,1355053
+2005,Commercial farms,All other livestock,icrop,108240
+2005,Commercial farms,General Cash Grains,icrop,367169
+2005,Commercial farms,Soybean,icrop,187804
+2005,Commercial farms,Hogs,icrop,102811
+2005,Commercial farms,Dairy,icrop,20496
+2006,Commercial farms,"Specialty Crops (F,V,N)",icrop,1162819
+2006,Commercial farms,Poultry,icrop,NA
+2006,Commercial farms,Dairy,icrop,77445
+2006,Commercial farms,All other livestock,icrop,263411
+2006,Commercial farms,General Cash Grains,icrop,354786
+2006,Commercial farms,Corn,icrop,378908
+2006,Commercial farms,Soybean,icrop,NA
+2006,Commercial farms,Other Field Crops,icrop,44922
+2006,Commercial farms,Cattle,icrop,110335
+2006,Commercial farms,Hogs,icrop,133763
+2007,Commercial farms,General Cash Grains,icrop,328985
+2007,Commercial farms,Corn,icrop,436006
+2007,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2007,Commercial farms,Soybean,icrop,742390
+2007,Commercial farms,Other Field Crops,icrop,321538
+2007,Commercial farms,Cattle,icrop,112031
+2007,Commercial farms,Hogs,icrop,226864
+2007,Commercial farms,Poultry,icrop,17499
+2007,Commercial farms,Dairy,icrop,31624
+2007,Commercial farms,All other livestock,icrop,357401
+2008,Commercial farms,Soybean,icrop,316301
+2008,Commercial farms,"Specialty Crops (F,V,N)",icrop,648507
+2008,Commercial farms,Poultry,icrop,15325
+2008,Commercial farms,Dairy,icrop,125079
+2008,Commercial farms,General Cash Grains,icrop,385835
+2008,Commercial farms,Corn,icrop,527497
+2008,Commercial farms,Other Field Crops,icrop,54952
+2008,Commercial farms,Cattle,icrop,270151
+2008,Commercial farms,Hogs,icrop,320826
+2008,Commercial farms,All other livestock,icrop,207722
+2009,Commercial farms,Corn,icrop,515496
+2009,Commercial farms,"Specialty Crops (F,V,N)",icrop,498793
+2009,Commercial farms,Cattle,icrop,147100
+2009,Commercial farms,Poultry,icrop,52426
+2009,Commercial farms,Dairy,icrop,62358
+2009,Commercial farms,All other livestock,icrop,171482
+2009,Commercial farms,General Cash Grains,icrop,426481
+2009,Commercial farms,Soybean,icrop,333827
+2009,Commercial farms,Other Field Crops,icrop,25559
+2009,Commercial farms,Hogs,icrop,267143
+2010,Commercial farms,Other Field Crops,icrop,NA
+2010,Commercial farms,Hogs,icrop,372189
+2010,Commercial farms,General Cash Grains,icrop,411178
+2010,Commercial farms,Corn,icrop,501888
+2010,Commercial farms,Soybean,icrop,427175
+2010,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2010,Commercial farms,Cattle,icrop,167922
+2010,Commercial farms,Poultry,icrop,11340
+2010,Commercial farms,Dairy,icrop,40022
+2010,Commercial farms,All other livestock,icrop,73636
+2011,Commercial farms,Soybean,icrop,418641
+2011,Commercial farms,Cattle,icrop,137582
+2011,Commercial farms,All other livestock,icrop,464429
+2011,Commercial farms,General Cash Grains,icrop,674738
+2011,Commercial farms,Corn,icrop,551265
+2011,Commercial farms,Other Field Crops,icrop,0
+2011,Commercial farms,Hogs,icrop,598005
+2011,Commercial farms,Poultry,icrop,NA
+2011,Commercial farms,Dairy,icrop,NA
+2012,Commercial farms,General Cash Grains,icrop,485264
+2012,Commercial farms,Corn,icrop,742159
+2012,Commercial farms,All other livestock,icrop,68871
+2012,Commercial farms,Soybean,icrop,498907
+2012,Commercial farms,Other Field Crops,icrop,NA
+2012,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2012,Commercial farms,Cattle,icrop,224042
+2012,Commercial farms,Hogs,icrop,355079
+2012,Commercial farms,Poultry,icrop,61107
+2012,Commercial farms,Dairy,icrop,82002
+2013,Commercial farms,General Cash Grains,icrop,804543
+2013,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2013,Commercial farms,Hogs,icrop,316654
+2013,Commercial farms,Corn,icrop,712408
+2013,Commercial farms,Soybean,icrop,583030
+2013,Commercial farms,Other Field Crops,icrop,108980
+2013,Commercial farms,Cattle,icrop,220513
+2013,Commercial farms,Poultry,icrop,NA
+2013,Commercial farms,Dairy,icrop,109353
+2013,Commercial farms,All other livestock,icrop,209222
+2014,Commercial farms,General Cash Grains,icrop,520453
+2014,Commercial farms,Corn,icrop,676313
+2014,Commercial farms,Other Field Crops,icrop,NA
+2014,Commercial farms,"Specialty Crops (F,V,N)",icrop,NA
+2014,Commercial farms,All other livestock,icrop,403645
+2014,Commercial farms,Soybean,icrop,601344
+2014,Commercial farms,Cattle,icrop,145093
+2014,Commercial farms,Hogs,icrop,294617
+2014,Commercial farms,Poultry,icrop,317801
+2014,Commercial farms,Dairy,icrop,46353
+2015,Commercial farms,Other Field Crops,icrop,NA
+2015,Commercial farms,General Cash Grains,icrop,474370
+2015,Commercial farms,Corn,icrop,642870
+2015,Commercial farms,Soybean,icrop,482790
+2015,Commercial farms,Cattle,icrop,211324
+2015,Commercial farms,Hogs,icrop,308023
+2015,Commercial farms,Poultry,icrop,86297
+2015,Commercial farms,Dairy,icrop,51072
+2015,Commercial farms,All other livestock,icrop,416082
+2016,Commercial farms,Corn,icrop,608160
+2016,Commercial farms,Soybean,icrop,581195
+2016,Commercial farms,Hogs,icrop,294532
+2016,Commercial farms,Poultry,icrop,149958
+2016,Commercial farms,All other livestock,icrop,189722
+2016,Commercial farms,General Cash Grains,icrop,571763
+2016,Commercial farms,Other Field Crops,icrop,NA
+2016,Commercial farms,Cattle,icrop,226429
+2016,Commercial farms,Dairy,icrop,62618
+2017,Commercial farms,General Cash Grains,icrop,480889
+2017,Commercial farms,Corn,icrop,717130
+2017,Commercial farms,"Specialty Crops (F,V,N)",icrop,1718839
+2017,Commercial farms,Cattle,icrop,138600
+2017,Commercial farms,Poultry,icrop,NA
+2017,Commercial farms,Soybean,icrop,486663
+2017,Commercial farms,Other Field Crops,icrop,18816
+2017,Commercial farms,Hogs,icrop,458050
+2017,Commercial farms,Dairy,icrop,40284
+2017,Commercial farms,All other livestock,icrop,439996
+2018,Commercial farms,General Cash Grains,icrop,564343
+2018,Commercial farms,Cattle,icrop,168089
+2018,Commercial farms,Poultry,icrop,NA
+2018,Commercial farms,Dairy,icrop,101390
+2018,Commercial farms,Corn,icrop,745030
+2018,Commercial farms,Soybean,icrop,605326
+2018,Commercial farms,Other Field Crops,icrop,NA
+2018,Commercial farms,Hogs,icrop,446402
+2018,Commercial farms,All other livestock,icrop,NA
+2003,Intermediate farms,Soybean,icrop,60174
+2003,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2003,Intermediate farms,Cattle,icrop,14793
+2003,Intermediate farms,Hogs,icrop,24353
+2003,Intermediate farms,Dairy,icrop,4890
+2003,Intermediate farms,General Cash Grains,icrop,54244
+2003,Intermediate farms,Corn,icrop,86298
+2003,Intermediate farms,Other Field Crops,icrop,33211
+2003,Intermediate farms,All other livestock,icrop,4569
+2004,Intermediate farms,General Cash Grains,icrop,63500
+2004,Intermediate farms,Corn,icrop,93104
+2004,Intermediate farms,Other Field Crops,icrop,13760
+2004,Intermediate farms,Cattle,icrop,21653
+2004,Intermediate farms,Dairy,icrop,11228
+2004,Intermediate farms,All other livestock,icrop,19547
+2004,Intermediate farms,Soybean,icrop,61357
+2004,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2004,Intermediate farms,Hogs,icrop,32124
+2005,Intermediate farms,General Cash Grains,icrop,63225
+2005,Intermediate farms,Other Field Crops,icrop,35487
+2005,Intermediate farms,"Specialty Crops (F,V,N)",icrop,72383
+2005,Intermediate farms,Hogs,icrop,34201
+2005,Intermediate farms,Poultry,icrop,NA
+2005,Intermediate farms,All other livestock,icrop,17910
+2005,Intermediate farms,Corn,icrop,75178
+2005,Intermediate farms,Soybean,icrop,62013
+2005,Intermediate farms,Cattle,icrop,15370
+2005,Intermediate farms,Dairy,icrop,8790
+2006,Intermediate farms,General Cash Grains,icrop,58287
+2006,Intermediate farms,Wheat,icrop,NA
+2006,Intermediate farms,Corn,icrop,95925
+2006,Intermediate farms,Soybean,icrop,48288
+2006,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2006,Intermediate farms,Poultry,icrop,NA
+2006,Intermediate farms,All other livestock,icrop,11926
+2006,Intermediate farms,Other Field Crops,icrop,18893
+2006,Intermediate farms,Cattle,icrop,13193
+2006,Intermediate farms,Hogs,icrop,45042
+2006,Intermediate farms,Dairy,icrop,10041
+2007,Intermediate farms,General Cash Grains,icrop,68431
+2007,Intermediate farms,Corn,icrop,100130
+2007,Intermediate farms,Soybean,icrop,30977
+2007,Intermediate farms,Other Field Crops,icrop,14069
+2007,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2007,Intermediate farms,Cattle,icrop,23983
+2007,Intermediate farms,Hogs,icrop,55547
+2007,Intermediate farms,Dairy,icrop,NA
+2007,Intermediate farms,All other livestock,icrop,9139
+2008,Intermediate farms,Corn,icrop,99531
+2008,Intermediate farms,Soybean,icrop,50139
+2008,Intermediate farms,Other Field Crops,icrop,24081
+2008,Intermediate farms,Cattle,icrop,11813
+2008,Intermediate farms,Hogs,icrop,NA
+2008,Intermediate farms,Dairy,icrop,15683
+2008,Intermediate farms,All other livestock,icrop,12929
+2008,Intermediate farms,General Cash Grains,icrop,90529
+2008,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2009,Intermediate farms,Other Field Crops,icrop,3429
+2009,Intermediate farms,Hogs,icrop,36537
+2009,Intermediate farms,Poultry,icrop,NA
+2009,Intermediate farms,Dairy,icrop,967
+2009,Intermediate farms,All other livestock,icrop,9429
+2009,Intermediate farms,General Cash Grains,icrop,74248
+2009,Intermediate farms,Corn,icrop,92500
+2009,Intermediate farms,Soybean,icrop,75791
+2009,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2009,Intermediate farms,Cattle,icrop,11544
+2010,Intermediate farms,Corn,icrop,102345
+2010,Intermediate farms,Soybean,icrop,95568
+2010,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2010,Intermediate farms,Dairy,icrop,16567
+2010,Intermediate farms,General Cash Grains,icrop,78847
+2010,Intermediate farms,Other Field Crops,icrop,3040
+2010,Intermediate farms,Cattle,icrop,8195
+2010,Intermediate farms,Hogs,icrop,NA
+2010,Intermediate farms,Poultry,icrop,NA
+2010,Intermediate farms,All other livestock,icrop,1660
+2011,Intermediate farms,Corn,icrop,116471
+2011,Intermediate farms,Soybean,icrop,51796
+2011,Intermediate farms,Other Field Crops,icrop,178
+2011,Intermediate farms,Cattle,icrop,18184
+2011,Intermediate farms,Hogs,icrop,68386
+2011,Intermediate farms,Dairy,icrop,5355
+2011,Intermediate farms,General Cash Grains,icrop,80133
+2011,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2011,Intermediate farms,Poultry,icrop,NA
+2011,Intermediate farms,All other livestock,icrop,NA
+2012,Intermediate farms,General Cash Grains,icrop,90480
+2012,Intermediate farms,Corn,icrop,120029
+2012,Intermediate farms,Soybean,icrop,65800
+2012,Intermediate farms,Other Field Crops,icrop,10991
+2012,Intermediate farms,Hogs,icrop,37414
+2012,Intermediate farms,Poultry,icrop,NA
+2012,Intermediate farms,All other livestock,icrop,4474
+2012,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2012,Intermediate farms,Cattle,icrop,11966
+2012,Intermediate farms,Dairy,icrop,NA
+2013,Intermediate farms,General Cash Grains,icrop,130581
+2013,Intermediate farms,Corn,icrop,142656
+2013,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2013,Intermediate farms,Hogs,icrop,91567
+2013,Intermediate farms,Dairy,icrop,NA
+2013,Intermediate farms,All other livestock,icrop,7946
+2013,Intermediate farms,Soybean,icrop,97987
+2013,Intermediate farms,Other Field Crops,icrop,5728
+2013,Intermediate farms,Cattle,icrop,12346
+2013,Intermediate farms,Poultry,icrop,NA
+2014,Intermediate farms,General Cash Grains,icrop,120440
+2014,Intermediate farms,Corn,icrop,132446
+2014,Intermediate farms,Soybean,icrop,74852
+2014,Intermediate farms,Dairy,icrop,25151
+2014,Intermediate farms,All other livestock,icrop,NA
+2014,Intermediate farms,Other Field Crops,icrop,14869
+2014,Intermediate farms,"Specialty Crops (F,V,N)",icrop,57663
+2014,Intermediate farms,Cattle,icrop,13882
+2014,Intermediate farms,Hogs,icrop,75831
+2014,Intermediate farms,Poultry,icrop,NA
+2015,Intermediate farms,General Cash Grains,icrop,138568
+2015,Intermediate farms,Other Field Crops,icrop,1869
+2015,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2015,Intermediate farms,Hogs,icrop,48276
+2015,Intermediate farms,Dairy,icrop,15889
+2015,Intermediate farms,All other livestock,icrop,4425
+2015,Intermediate farms,Corn,icrop,144934
+2015,Intermediate farms,Soybean,icrop,83840
+2015,Intermediate farms,Cattle,icrop,18113
+2015,Intermediate farms,Poultry,icrop,NA
+2016,Intermediate farms,General Cash Grains,icrop,125660
+2016,Intermediate farms,Soybean,icrop,149063
+2016,Intermediate farms,Other Field Crops,icrop,5730
+2016,Intermediate farms,Cattle,icrop,14739
+2016,Intermediate farms,Hogs,icrop,80632
+2016,Intermediate farms,Poultry,icrop,NA
+2016,Intermediate farms,Corn,icrop,150358
+2016,Intermediate farms,Dairy,icrop,7583
+2016,Intermediate farms,All other livestock,icrop,3647
+2017,Intermediate farms,General Cash Grains,icrop,112642
+2017,Intermediate farms,Corn,icrop,129906
+2017,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2017,Intermediate farms,Hogs,icrop,44303
+2017,Intermediate farms,Poultry,icrop,NA
+2017,Intermediate farms,Dairy,icrop,5533
+2017,Intermediate farms,Soybean,icrop,76023
+2017,Intermediate farms,Other Field Crops,icrop,5723
+2017,Intermediate farms,Cattle,icrop,15915
+2017,Intermediate farms,All other livestock,icrop,8383
+2018,Intermediate farms,Corn,icrop,126917
+2018,Intermediate farms,Soybean,icrop,148711
+2018,Intermediate farms,Other Field Crops,icrop,3630
+2018,Intermediate farms,"Specialty Crops (F,V,N)",icrop,NA
+2018,Intermediate farms,Cattle,icrop,13441
+2018,Intermediate farms,Dairy,icrop,NA
+2018,Intermediate farms,All other livestock,icrop,3718
+2018,Intermediate farms,General Cash Grains,icrop,110550
+2018,Intermediate farms,Hogs,icrop,29643
+2003,Residence farms,Corn,icrop,37668
+2003,Residence farms,Other Field Crops,icrop,6743
+2003,Residence farms,Cattle,icrop,3795
+2003,Residence farms,Hogs,icrop,5487
+2003,Residence farms,All other livestock,icrop,473
+2003,Residence farms,General Cash Grains,icrop,37364
+2003,Residence farms,Soybean,icrop,49852
+2003,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2004,Residence farms,Corn,icrop,28028
+2004,Residence farms,Soybean,icrop,37481
+2004,Residence farms,Other Field Crops,icrop,1279
+2004,Residence farms,Hogs,icrop,17654
+2004,Residence farms,Poultry,icrop,NA
+2004,Residence farms,All other livestock,icrop,1980
+2004,Residence farms,General Cash Grains,icrop,47782
+2004,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2004,Residence farms,Cattle,icrop,2503
+2005,Residence farms,General Cash Grains,icrop,48662
+2005,Residence farms,Soybean,icrop,30180
+2005,Residence farms,"Specialty Crops (F,V,N)",icrop,13517
+2005,Residence farms,Cattle,icrop,3027
+2005,Residence farms,Hogs,icrop,693
+2005,Residence farms,Corn,icrop,30255
+2005,Residence farms,Other Field Crops,icrop,2174
+2005,Residence farms,Dairy,icrop,NA
+2005,Residence farms,All other livestock,icrop,2537
+2006,Residence farms,General Cash Grains,icrop,36877
+2006,Residence farms,Corn,icrop,43812
+2006,Residence farms,Other Field Crops,icrop,5021
+2006,Residence farms,"Specialty Crops (F,V,N)",icrop,15414
+2006,Residence farms,Hogs,icrop,35394
+2006,Residence farms,Dairy,icrop,NA
+2006,Residence farms,Soybean,icrop,29732
+2006,Residence farms,Cattle,icrop,3465
+2006,Residence farms,Poultry,icrop,NA
+2006,Residence farms,All other livestock,icrop,691
+2007,Residence farms,General Cash Grains,icrop,53665
+2007,Residence farms,Soybean,icrop,47865
+2007,Residence farms,Cattle,icrop,1782
+2007,Residence farms,All other livestock,icrop,0
+2007,Residence farms,Corn,icrop,61329
+2007,Residence farms,Other Field Crops,icrop,3911
+2007,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2007,Residence farms,Hogs,icrop,NA
+2008,Residence farms,General Cash Grains,icrop,46008
+2008,Residence farms,Other Field Crops,icrop,1972
+2008,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2008,Residence farms,Cattle,icrop,3186
+2008,Residence farms,Hogs,icrop,NA
+2008,Residence farms,All other livestock,icrop,205
+2008,Residence farms,Corn,icrop,56739
+2008,Residence farms,Soybean,icrop,35788
+2009,Residence farms,General Cash Grains,icrop,77572
+2009,Residence farms,Wheat,icrop,NA
+2009,Residence farms,Corn,icrop,75483
+2009,Residence farms,Soybean,icrop,34590
+2009,Residence farms,"Specialty Crops (F,V,N)",icrop,10956
+2009,Residence farms,Cattle,icrop,2284
+2009,Residence farms,Hogs,icrop,3671
+2009,Residence farms,Poultry,icrop,NA
+2009,Residence farms,All other livestock,icrop,858
+2009,Residence farms,Other Field Crops,icrop,3279
+2010,Residence farms,General Cash Grains,icrop,54969
+2010,Residence farms,Other Field Crops,icrop,483
+2010,Residence farms,Cattle,icrop,3438
+2010,Residence farms,Poultry,icrop,NA
+2010,Residence farms,Corn,icrop,64552
+2010,Residence farms,Soybean,icrop,45455
+2010,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2010,Residence farms,Hogs,icrop,NA
+2010,Residence farms,Dairy,icrop,NA
+2010,Residence farms,All other livestock,icrop,1114
+2011,Residence farms,Corn,icrop,76429
+2011,Residence farms,Other Field Crops,icrop,409
+2011,Residence farms,Cattle,icrop,3303
+2011,Residence farms,All other livestock,icrop,346
+2011,Residence farms,General Cash Grains,icrop,67743
+2011,Residence farms,Soybean,icrop,26382
+2011,Residence farms,"Specialty Crops (F,V,N)",icrop,11695
+2011,Residence farms,Hogs,icrop,NA
+2011,Residence farms,Poultry,icrop,NA
+2012,Residence farms,General Cash Grains,icrop,29121
+2012,Residence farms,Corn,icrop,99693
+2012,Residence farms,Other Field Crops,icrop,3559
+2012,Residence farms,"Specialty Crops (F,V,N)",icrop,4208
+2012,Residence farms,Cattle,icrop,3523
+2012,Residence farms,Soybean,icrop,59957
+2012,Residence farms,Hogs,icrop,NA
+2012,Residence farms,Poultry,icrop,NA
+2012,Residence farms,All other livestock,icrop,49
+2013,Residence farms,Corn,icrop,81316
+2013,Residence farms,Soybean,icrop,34484
+2013,Residence farms,Other Field Crops,icrop,1946
+2013,Residence farms,"Specialty Crops (F,V,N)",icrop,9044
+2013,Residence farms,All other livestock,icrop,194
+2013,Residence farms,General Cash Grains,icrop,65641
+2013,Residence farms,Cattle,icrop,3947
+2013,Residence farms,Hogs,icrop,2056
+2013,Residence farms,Poultry,icrop,NA
+2014,Residence farms,Corn,icrop,74675
+2014,Residence farms,Soybean,icrop,61171
+2014,Residence farms,Other Field Crops,icrop,2369
+2014,Residence farms,"Specialty Crops (F,V,N)",icrop,8613
+2014,Residence farms,Cattle,icrop,3794
+2014,Residence farms,Dairy,icrop,NA
+2014,Residence farms,General Cash Grains,icrop,86027
+2014,Residence farms,Hogs,icrop,10001
+2014,Residence farms,All other livestock,icrop,167
+2015,Residence farms,Other Field Crops,icrop,487
+2015,Residence farms,Hogs,icrop,16653
+2015,Residence farms,Poultry,icrop,NA
+2015,Residence farms,All other livestock,icrop,457
+2015,Residence farms,General Cash Grains,icrop,64533
+2015,Residence farms,Corn,icrop,71945
+2015,Residence farms,Soybean,icrop,38266
+2015,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2015,Residence farms,Cattle,icrop,11594
+2016,Residence farms,Corn,icrop,87522
+2016,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2016,Residence farms,Cattle,icrop,2330
+2016,Residence farms,Hogs,icrop,48742
+2016,Residence farms,All other livestock,icrop,NA
+2016,Residence farms,General Cash Grains,icrop,81141
+2016,Residence farms,Soybean,icrop,32990
+2016,Residence farms,Other Field Crops,icrop,1191
+2016,Residence farms,Poultry,icrop,NA
+2016,Residence farms,Dairy,icrop,NA
+2017,Residence farms,General Cash Grains,icrop,59646
+2017,Residence farms,Soybean,icrop,39169
+2017,Residence farms,Other Field Crops,icrop,1174
+2017,Residence farms,Hogs,icrop,1746
+2017,Residence farms,Poultry,icrop,NA
+2017,Residence farms,Dairy,icrop,NA
+2017,Residence farms,Corn,icrop,94092
+2017,Residence farms,"Specialty Crops (F,V,N)",icrop,32829
+2017,Residence farms,Cattle,icrop,5395
+2017,Residence farms,All other livestock,icrop,554
+2018,Residence farms,General Cash Grains,icrop,82391
+2018,Residence farms,"Specialty Crops (F,V,N)",icrop,NA
+2018,Residence farms,Cattle,icrop,2614
+2018,Residence farms,Corn,icrop,109746
+2018,Residence farms,Soybean,icrop,36160
+2018,Residence farms,Other Field Crops,icrop,1750
+2018,Residence farms,Hogs,icrop,NA
+2018,Residence farms,Poultry,icrop,NA
+2018,Residence farms,All other livestock,icrop,55

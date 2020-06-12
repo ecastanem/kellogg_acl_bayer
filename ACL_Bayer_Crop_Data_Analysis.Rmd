@@ -1,0 +1,2233 @@
+---
+title: "ACL/Bayer Crop Data Analysis"
+author: "Brown, Castaneda, Walsh and Yoshida (2020)"
+date: "9/6/2020"
+output: html_document
+---
+
+This chunk loads the required libraries and define the scale color functions. 
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+
+#General chunk to load libraries, datasets and color scales.
+list.of.packages <- c("data.table","kableExtra","ggthemes","rjson","dbplyr","dplyr","knitr",
+                      "tidyverse","readxl", "esquisse","xtable","viridis","grid","gridExtra",
+                      "psych","ggplot2","ggcorrplot","reshape","reshape2","scales","janitor",
+                      "gamlr","Matrix","gridExtra","grid","summarytools","caret","randomForest",
+                      "jsonlite","httr","tidyr","pROC","rpart.plot","gamlr","Matrix","gridExtra",
+                      "grid","summarytools","caret","randomForest","pROC","rpart.plot", "skimr","igraph", 
+                      "network", "sna", "ggraph", "visNetwork", "threejs", "networkD3", "ndtv",
+                      "GGally", "intergraph")
+
+for (i in list.of.packages)
+{
+  print(eval(i))
+  if (!require(i, character.only=TRUE)) install.packages(i); require(i, character.only=TRUE) 
+}
+
+#Create Scale of colors:
+bayer_colors <- c(`light_blue`="#04bcfb", `light_green`="#8bd32d",`grey`="#dddddd",`green_water`="#25c4c4",`dark_green`="#14643c",`dark_blue`="#0c3b4c",`white`="#ffffff")
+
+#Function to get the colors:
+bayer_cols <- function(...) {
+  cols <- c(...)
+  if (is.null(cols))
+    return (bayer_colors)
+  bayer_colors[cols]
+}
+
+#Create colors lists:
+bayer_palettes <- list(`main`=bayer_cols("light_blue","green_water","light_green","dark_green","dark_blue"),
+  `blues`=bayer_cols("light_blue", "dark_blue"),
+  `greens` = bayer_cols("light_green", "dark_green"),
+  `light_to_dark_green`=bayer_cols("light_green","dark_green"),
+  `light_to_dark_blue`=bayer_cols("light_blue","dark_blue"),
+  `lightgreen_to_darkblue`=bayer_cols("light_green","dark_blue"),
+  `lights`=bayer_cols("light_green","light_blue","green_water"),
+  `lights2`=bayer_cols("light_green","green_water","light_blue"),
+  `lights3`=bayer_cols("light_green","dark_blue","dark_green","light_blue"))
+
+bayer_pal <- function(palette = "main", reverse = FALSE, ...) {
+  pal <- bayer_palettes[[palette]]
+  if (reverse) pal <- rev(pal)
+  colorRampPalette(pal, ...)
+}
+
+scale_color_bayer <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- bayer_pal(palette = palette, reverse = reverse)
+  
+  if (discrete) {
+    discrete_scale("colour", paste0("bayer_", palette), palette = pal, ...)
+  } else {
+    scale_color_gradientn(colours = pal(256), ...)
+  }
+}
+
+scale_fill_bayer <- function(palette = "main", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- bayer_pal(palette = palette, reverse = reverse)
+  
+  if (discrete) {
+    discrete_scale("fill", paste0("bayer_", palette), palette = pal, ...)
+  } else {
+    scale_fill_gradientn(colours = pal(256), ...)
+  }
+}
+
+# Set some defaults for the R Markdown document
+opts_chunk$set(echo=TRUE,      # Print the code in all the chunks
+               warning=FALSE,  # Don't print warning statements
+               message=FALSE,  # Don't print other R output messages
+               comment=NA)     # Helps produce prettier output
+
+```
+
+#Data Loading
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+
+#Load Agribenchmark datasets
+df_agribenchmark <- read_csv("df_agribenchmark.csv")
+
+#Load FAO datasets
+df_fao_data_commodityB<-read.csv(file = './FAO Data/df_fao_data_commodityB.csv')
+df_fao_data_crops<-read.csv(file = './FAO Data/df_fao_data_crops.csv')
+df_fao_data_fertilizers<-read.csv(file = './FAO Data/df_fao_data_fertilizers.csv')
+df_fao_data_macro<-read.csv(file = './FAO Data/df_fao_data_macro.csv')
+df_fao_data_pesticides<-read.csv(file = './FAO Data/df_fao_data_pesticides.csv')
+df_fao_data_pesticides_total<-read.csv(file = './FAO Data/df_fao_data_pesticides_total.csv')
+df_ethanol_data <- read_excel('./Teams_files/US_Ethanol_Data.xlsx')
+#df_ARMS_expanded<-read.csv('df_ARMS_expanded.csv')
+
+#Load weather datasets from Bayer
+Weather1 <- read.csv(file = 'weather_us_monthly_00_19_1.csv')
+Weather2 <- read.csv(file = 'weather_us_monthly_00_19_2.csv')
+Weather3 <- read.csv(file = 'weather_us_monthly_00_19_3.csv')
+Weather4 <- read.csv(file = 'weather_us_monthly_00_19_4.csv')
+fips <- read.csv(file = 'county_fips_master.csv')
+
+#Load ARMS datasets
+df_ARMS_expanded <- read.csv(file = 'df_ARMS_expanded.csv')
+table_sales_iowa <- read.csv(file = 'table_sales_iowa.csv')
+```
+
+#Agribenchmark analysis
+Rows by country was visualized in tableau.
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+df_agribenchmark %>% 
+  filter(`Result year` == "2017") %>% 
+  tabyl(Nation2) %>% 
+  kable()
+```
+
+```{r,include=FALSE, message=FALSE, echo=FALSE}
+aux<-df_agribenchmark %>% 
+  mutate(Crop2=ifelse(Crop=='rice','other',Crop)) %>%
+  select(c('Result.year','Acreage','Crop2','Continent','Crop.yield','Gross.revenue',
+           'Direct.cost', 'Labor','Machinery','Contractor','Diesel','Other.energy.cost',
+           'Buildings','Land','Miscellaneous','Profit')) %>%
+  mutate(
+    Gross.revenue=Acreage*Gross.revenue,
+    Direct.cost=Acreage*Direct.cost,
+    Operating.cost=Acreage*(Labor+Machinery+Contractor+Diesel+Other.energy.cost),
+    Other.cost=Acreage*(Buildings+Land+Miscellaneous),
+    Profit=Acreage*Profit) %>% select(c('Result.year','Acreage','Crop2','Continent','Crop.yield','Gross.revenue',
+           'Direct.cost', 'Operating.cost', 'Other.cost','Profit'))
+
+names(aux)<-c('Year','Acreage','Crop','Continent','Crop yield','Gross Revenue', 'Direct Cost',
+              'Operating Cost','Other Cost','Profit')
+
+aux2<-aux %>% select(-c('Crop yield')) %>% group_by(Year, Crop, Continent) %>% summarise_all(sum) %>%
+  mutate(
+    `Gross Revenue`=`Gross Revenue`/Acreage,
+    `Direct Cost` =`Direct Cost`/Acreage,
+    `Operating Cost`=`Operating Cost`/Acreage,
+    `Other Cost`=`Other Cost`/Acreage,
+    `Profit`=Profit/Acreage)
+
+aux3<-aux2 %>%
+  mutate(
+    `2. Direct Cost` =`Direct Cost`,
+    `3. Operating Cost`=`Operating Cost`,
+    `4. Other Costs`=`Other Cost`,
+    `1. Profit`=Profit) %>% select(-c('Acreage','Gross Revenue','Direct Cost',
+                                      'Operating Cost','Other Cost', 'Profit')) %>% 
+  gather(`2. Direct Cost`:`1. Profit`, key='Variable', value='Percentage')
+
+aux3 %>% filter(Continent=="Africa") %>% ggplot(aes(x=Year)) +
+  facet_wrap(.~Crop, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="P&L Variables per Acreage", subtitle = "Africa",caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+
+aux3 %>% filter(Continent=="Asia") %>% ggplot(aes(x=Year)) +
+  facet_wrap(.~Crop, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="P&L Variables per Acreage", subtitle = "Asia",caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+
+aux3 %>% filter(Continent=="Europe") %>% ggplot(aes(x=Year)) +
+  facet_wrap(.~Crop, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="P&L Variables per Acreage", subtitle = "Europe",caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+
+aux3 %>% filter(Continent=="North America") %>% ggplot(aes(x=Year)) +
+  facet_wrap(.~Crop, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="P&L Variables per Acreage", subtitle = "North America",caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+
+aux3 %>% filter(Continent=="Oceania") %>% ggplot(aes(x=Year)) +
+  facet_wrap(.~Crop, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="P&L Variables per Acreage", subtitle = "Oceania",caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+
+aux3 %>% filter(Continent=="South America") %>% ggplot(aes(x=Year)) +
+  facet_wrap(.~Crop, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="P&L Variables per Acreage", subtitle = "South America", caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+
+aux3 %>% filter(Year==2018) %>% ggplot(aes(x=Crop)) +
+  facet_wrap(.~Continent, scales = 'free') +
+  geom_bar(aes(y=Percentage, fill=Variable), colour=bayer_cols('white'),stat = 'identity', alpha=.85)+
+  scale_fill_bayer(palette = 'lights2', discrete = TRUE,reverse = FALSE)+
+#  scale_x_continuous(breaks=seq(2008,2019,1))+
+  labs(title="Fig 5. P&L Variables per Acreage", subtitle = "2018",caption="Source: self-elaboration based on Agribenchmark's dataset",x="Year",y="USD",
+       colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+    theme(axis.text.x = element_text(color = "grey20", size = 25, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 25, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 35, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =35, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 45, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 20), legend.text = element_text(color = "grey20", size = 35, angle = 0, hjust = .5, vjust = 0, face = "plain"), strip.text = element_text(size=25)
+        )
+```
+
+
+#Modeling Farmer Decisions
+Analysis more generalizable
+
+Create Inputs
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+#I should create this with variables for the major inputs (crop, timeframe, region, etc) and then I can just change the inputs and re-run the analyses
+
+# YUTA: for some reaseon the [] didn't run on mine so changed to () 
+# crop_targets <- c["Maize"]
+# 
+# region <- c["United States of America"]
+
+
+rm(df_lm)
+crop_targets <- c("Maize")
+
+region <- c("United States of America")
+
+start_year <- 1990
+start_test_year <- 2012
+end_year <- 2018
+
+
+
+```
+
+Filter datasets to analyze and create multivariate linear model
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+target_data <- df_fao_data_crops %>%
+  filter(Area %in% region, Item %in% crop_targets, Year <= end_year & Year >= start_year)
+
+region_macro <- df_fao_data_macro %>%
+  filter(Area %in% region)
+
+target_data <- target_data %>%
+  left_join(region_macro, by="Year", suffix = c("","macro"))
+
+
+target_data <- target_data %>%
+  mutate(HA_lag1 = lag(HarvestedArea,1),
+         Cropland_lag1 = lag(Cropland,1),
+         Price_lag1 = lag(Price,1),
+         GDP_lag1 = lag(GDP,1),
+         Pop_lag1 = lag(Population,1))
+
+
+df_lm <- target_data %>%
+  select(Year, HarvestedArea, HA_lag1, Cropland_lag1, Price_lag1, GDP_lag1, Pop_lag1)
+
+lm_target <- lm(HarvestedArea ~ . - Year, df_lm)
+
+
+summary(lm_target)
+
+
+```
+
+Attempt with just price and GDP lagged by one year
+```{r}
+
+new_form <- formula(HarvestedArea ~  Price_lag1 + GDP_lag1)
+
+lm_target <- lm(new_form, df_lm)
+
+
+summary(lm_target)
+
+```
+
+
+Split Test and train and check prediction
+
+```{r}
+
+df_lm_train <- df_lm %>%
+  filter(Year <= start_test_year)
+
+
+df_lm_test <- df_lm %>%
+  filter(Year > start_test_year)
+
+
+lm_target_train <- lm(new_form, df_lm_train)
+
+
+summary(lm_target_train)
+
+
+df_lm <- df_lm %>%
+  mutate(pred = predict(lm_target_train, df_lm, type = "response"))
+
+
+df_lm <- df_lm %>%
+  mutate(diff_percent = (pred - HarvestedArea)/HarvestedArea,
+         abs_diff_percent = abs(pred - HarvestedArea)/HarvestedArea)
+
+glimpse(df_lm)
+
+df_lm %>%
+  filter(Year > start_test_year) %>%
+  summarize(av_error = mean(abs_diff_percent))
+
+
+pred_int_C <- predict(lm_target_train, df_lm_test %>% filter(Year > start_test_year), interval = "predict")
+
+
+x_int_C <- (start_test_year+1):end_year
+y_int_C <- pred_int_C[,1]
+y_int_low_C <- pred_int_C[,2]
+y_int_high_C <- pred_int_C[,3]
+
+x_int_C
+
+df_pred_int_C <- data.frame(Year = x_int_C, YlowC = y_int_low_C, YhighC = y_int_high_C)
+
+df_pred_int_C
+
+df_lm <- df_lm %>%
+  left_join(df_pred_int_C, by  = "Year")
+
+
+df_lm <- df_lm %>%
+  mutate(pred_int_percent_low = (pred - YlowC)/pred,
+         pred_int_percent_high = (YhighC - pred)/pred)
+
+
+df_lm %>%
+  summarize(mean_pred_diff_low = mean(pred_int_percent_low, na.rm = TRUE),
+            mean_pred_diff_high = mean(pred_int_percent_high, na.rm = TRUE))
+
+
+ggplot(df_lm, aes(x = Year)) + 
+  geom_line(aes(y = HarvestedArea), color = "Black") + 
+  geom_line(aes(y = pred), color = "Blue")
+
+colors <- c("Actual" = "black", "Prediction" = "steelblue", "Prediction Interval" = "gray")
+ggplot(df_lm, aes(x = Year)) + 
+  geom_line(aes(y = HarvestedArea, color = "Actual")) + 
+  geom_line(aes(y = pred, color = "Prediction")) + 
+  geom_errorbar(aes(ymin = YlowC, ymax = YhighC, color = "Prediction Interval"), width = 0.2) + 
+  scale_color_manual(name = "Harvested Area", values = colors) +
+  scale_x_continuous(limits=c(1990, 2018), breaks = seq(1990, 2020, 3)) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank()) + labs(x = "Year", y = "Harvested Area (ha)")
+
+
+ggplot(df_lm, aes(x = Year, y = Price_lag1)) + 
+  geom_line()
+
+
+```
+
+
+Everything starting here can't be generalized with inputs from input section of modeling farmer behavior
+
+Lagging GDP and Price for 2, 3, 4, and 5 years and modeling.
+```{r}
+
+df5_target_lag <- target_data %>%
+  select(Year, HarvestedArea, Price, GDP) %>%
+  filter(Year >= start_year) %>%
+  mutate(HA_lag1 = lag(HarvestedArea, 1),
+         P_lag1 = lag(Price, 1),
+         GDP_lag1 = lag(GDP, 1),
+         HA_lag2 = lag(HarvestedArea, 2),
+         P_lag2 = lag(Price, 2),
+         GDP_lag2 = lag(GDP, 2),
+         HA_lag3 = lag(HarvestedArea, 3),
+         P_lag3 = lag(Price, 3),
+         GDP_lag3 = lag(GDP, 3),
+         HA_lag4 = lag(HarvestedArea, 4),
+         P_lag4 = lag(Price, 4),
+         GDP_lag4 = lag(GDP, 4),
+         HA_lag5 = lag(HarvestedArea, 5),
+         P_lag5 = lag(Price, 5),
+         GDP_lag5 = lag(GDP, 5)
+         )
+
+df5_target_lag.train <- df5_target_lag %>%
+  filter(Year < start_test_year)
+
+df5_target_lag.test <- df5_target_lag %>%
+  filter(Year >= start_test_year)
+
+
+lm5_target_lag1 <- lm(HarvestedArea ~ P_lag1 + GDP_lag1, df5_target_lag.train)
+lm5_target_lag2 <- lm(HarvestedArea ~ P_lag2 + GDP_lag2, df5_target_lag.train %>% filter(Year >= start_year + 1))
+lm5_target_lag3 <- lm(HarvestedArea ~ P_lag3 + GDP_lag3, df5_target_lag.train %>% filter(Year >= start_year + 2))
+lm5_target_lag4 <- lm(HarvestedArea ~ P_lag4 + GDP_lag4, df5_target_lag.train %>% filter(Year >= start_year + 3))
+lm5_target_lag5 <- lm(HarvestedArea ~ P_lag5 + GDP_lag5, df5_target_lag.train %>% filter(Year >= start_year + 4))
+
+
+df5_target_lag <- df5_target_lag %>%
+  mutate(pred_lag1 = predict(lm5_target_lag1, df5_target_lag, type = "response"),
+         pred_lag2 = predict(lm5_target_lag2, df5_target_lag, type = "response"),
+         pred_lag3 = predict(lm5_target_lag3, df5_target_lag, type = "response"),
+         pred_lag4 = predict(lm5_target_lag4, df5_target_lag, type = "response"),
+         pred_lag5 = predict(lm5_target_lag5, df5_target_lag, type = "response")
+         )
+  
+
+
+df5_target_lag <- df5_target_lag %>%
+  mutate(abs_pdiff_lag1 = 100*abs(pred_lag1 - HarvestedArea)/HarvestedArea,
+         abs_pdiff_lag2 = 100*abs(pred_lag2 - HarvestedArea)/HarvestedArea,
+         abs_pdiff_lag3 = 100*abs(pred_lag3 - HarvestedArea)/HarvestedArea,
+         abs_pdiff_lag4 = 100*abs(pred_lag4 - HarvestedArea)/HarvestedArea,
+         abs_pdiff_lag5 = 100*abs(pred_lag5 - HarvestedArea)/HarvestedArea,
+         pdiff_lag1 = 100*(pred_lag1 - HarvestedArea)/HarvestedArea,
+         pdiff_lag2 = 100*(pred_lag2 - HarvestedArea)/HarvestedArea,
+         pdiff_lag3 = 100*(pred_lag3 - HarvestedArea)/HarvestedArea,
+         pdiff_lag4 = 100*(pred_lag4 - HarvestedArea)/HarvestedArea,
+         pdiff_lag5 = 100*(pred_lag5 - HarvestedArea)/HarvestedArea
+         )
+
+summary(lm5_target_lag1)
+summary(lm5_target_lag2)
+summary(lm5_target_lag3)
+summary(lm5_target_lag4)
+summary(lm5_target_lag5)
+
+df5_target_lag %>%
+  summarize(err5 = mean(abs_pdiff_lag5, na.rm = TRUE),
+            err4 = mean(abs_pdiff_lag4, na.rm = TRUE),
+            err3 = mean(abs_pdiff_lag3, na.rm = TRUE),
+            err2 = mean(abs_pdiff_lag2, na.rm = TRUE),
+            err1 = mean(abs_pdiff_lag1, na.rm = TRUE))
+
+pred_int_C1 <- predict(lm5_target_lag1, df5_target_lag %>% filter(Year == end_year), interval = "predict")
+pred_int_C2 <- predict(lm5_target_lag2, df5_target_lag %>% filter(Year == end_year), interval = "predict")
+pred_int_C3 <- predict(lm5_target_lag3, df5_target_lag %>% filter(Year == end_year), interval = "predict")
+pred_int_C4 <- predict(lm5_target_lag4, df5_target_lag %>% filter(Year == end_year), interval = "predict")
+pred_int_C5 <- predict(lm5_target_lag5, df5_target_lag %>% filter(Year == end_year), interval = "predict")
+
+percent_err1 <- (pred_int_C1[1] - pred_int_C1[2])/pred_int_C1[1]
+percent_err2 <- (pred_int_C2[1] - pred_int_C2[2])/pred_int_C2[1]
+percent_err3 <- (pred_int_C3[1] - pred_int_C3[2])/pred_int_C3[1]
+percent_err4 <- (pred_int_C4[1] - pred_int_C4[2])/pred_int_C4[1]
+percent_err5 <- (pred_int_C5[1] - pred_int_C5[2])/pred_int_C5[1]
+
+percent_err1
+percent_err2
+percent_err3
+percent_err4
+percent_err5
+
+pred_int_C1[1]
+
+
+glimpse(df5_target_lag)
+
+
+df5_target_lag %>%
+  ggplot(aes(x = Year)) + 
+  geom_line(aes(y = HarvestedArea), color = "black") +
+  geom_line(aes(y = pred_lag1), color = "yellow") +
+  geom_line(aes(y = pred_lag2), color = "red") +
+  geom_line(aes(y = pred_lag3), color = "green") +
+  geom_line(aes(y = pred_lag4), color = "blue") +
+  geom_line(aes(y = pred_lag5), color = "darkgreen")
+
+
+```
+
+Create 5 year projection and visuals for final presentations
+
+```{r}
+df5_proj <- df5_target_lag %>%
+  select(c("Year", "HarvestedArea", "GDP", "Price", "P_lag1", "P_lag2", "P_lag3", "P_lag4", "P_lag5", "GDP_lag1", "GDP_lag2", "GDP_lag3", "GDP_lag4", "GDP_lag5"))
+
+df5_proj$P_lag1[28] <- df5_proj$Price[28]
+df5_proj$P_lag2[28] <- df5_proj$Price[28]
+df5_proj$P_lag3[28] <- df5_proj$Price[28]
+df5_proj$P_lag4[28] <- df5_proj$Price[28]
+df5_proj$P_lag5[28] <- df5_proj$Price[28]
+
+df5_proj$GDP_lag1[28] <- df5_proj$GDP[28]
+df5_proj$GDP_lag2[28] <- df5_proj$GDP[28]
+df5_proj$GDP_lag3[28] <- df5_proj$GDP[28]
+df5_proj$GDP_lag4[28] <- df5_proj$GDP[28]
+df5_proj$GDP_lag5[28] <- df5_proj$GDP[28]
+
+
+df5_proj <- df5_proj %>%
+  mutate(pred_2018 = predict(lm5_target_lag1, df5_proj, type = "response"),
+         pred_2019 = predict(lm5_target_lag2, df5_proj, type = "response"),
+         pred_2020 = predict(lm5_target_lag3, df5_proj, type = "response"),
+         pred_2021 = predict(lm5_target_lag4, df5_proj, type = "response"),
+         pred_2022 = predict(lm5_target_lag5, df5_proj, type = "response")
+         )
+
+pred_int_C1 <- predict(lm5_target_lag1, df5_proj %>% filter(Year == end_year - 1), interval = "predict")
+pred_int_C2 <- predict(lm5_target_lag2, df5_proj %>% filter(Year == end_year - 1), interval = "predict")
+pred_int_C3 <- predict(lm5_target_lag3, df5_proj %>% filter(Year == end_year - 1), interval = "predict")
+pred_int_C4 <- predict(lm5_target_lag4, df5_proj %>% filter(Year == end_year - 1), interval = "predict")
+pred_int_C5 <- predict(lm5_target_lag5, df5_proj %>% filter(Year == end_year - 1), interval = "predict")
+
+pred_int_C1
+
+percent_err1 <- (pred_int_C1[1] - pred_int_C1[2])/pred_int_C1[1]
+percent_err2 <- (pred_int_C2[1] - pred_int_C2[2])/pred_int_C2[1]
+percent_err3 <- (pred_int_C3[1] - pred_int_C3[2])/pred_int_C3[1]
+percent_err4 <- (pred_int_C4[1] - pred_int_C4[2])/pred_int_C4[1]
+percent_err5 <- (pred_int_C5[1] - pred_int_C5[2])/pred_int_C5[1]
+
+percent_err1
+percent_err2
+percent_err3
+percent_err4
+percent_err5
+
+
+df5_proj_add <- data.frame("Year" = c(2019,2020,2021,2022), "HarvestedArea" = c(df5_proj$pred_2019[28], df5_proj$pred_2020[28], df5_proj$pred_2021[28], df5_proj$pred_2022[28] ))
+
+df5_proj_vis <- df5_proj %>%
+  select(Year, HarvestedArea)
+
+df5_proj_vis$HarvestedArea[29] <- df5_proj$pred_2018[28]
+
+df5_proj_vis <- rbind(df5_proj_vis, df5_proj_add)
+
+df5_proj_vis <- df5_proj_vis %>%
+  mutate(pred = NA)
+
+df5_proj_vis$pred[29] <- df5_proj_vis$HarvestedArea[29]
+df5_proj_vis$pred[30] <- df5_proj_vis$HarvestedArea[30]
+df5_proj_vis$pred[31] <- df5_proj_vis$HarvestedArea[31]
+df5_proj_vis$pred[32] <- df5_proj_vis$HarvestedArea[32]
+df5_proj_vis$pred[33] <- df5_proj_vis$HarvestedArea[33]
+
+
+df5_proj_vis <- df5_proj_vis %>%
+  mutate(YlowC = NA,
+         YhighC = NA)
+
+df5_proj_vis$YhighC[29] <- pred_int_C1[3]
+df5_proj_vis$YlowC[29] <- pred_int_C1[2]
+
+df5_proj_vis$YhighC[30] <- pred_int_C2[3]
+df5_proj_vis$YlowC[30] <- pred_int_C2[2]
+
+df5_proj_vis$YhighC[31] <- pred_int_C3[3]
+df5_proj_vis$YlowC[31] <- pred_int_C3[2]
+
+df5_proj_vis$YhighC[32] <- pred_int_C4[3]
+df5_proj_vis$YlowC[32] <- pred_int_C4[2]
+
+df5_proj_vis$YhighC[33] <- pred_int_C5[3]
+df5_proj_vis$YlowC[33] <- pred_int_C5[2]
+
+df5_proj_vis %>%
+  ggplot(aes(x = Year)) + 
+  geom_line(aes(y = HarvestedArea), color = "black") + 
+  geom_line(aes(y = pred), color = "blue")
+
+
+colors <- c("Actual" = "black", "Prediction" = "steelblue", "Prediction Interval" = "gray")
+ggplot(df5_proj_vis, aes(x = Year)) + 
+  geom_line(aes(y = HarvestedArea, color = "Actual")) + 
+  geom_line(aes(y = pred, color = "Prediction")) + 
+  geom_errorbar(aes(ymin = YlowC, ymax = YhighC, color = "Prediction Interval"), width = 0.2) + 
+  scale_x_continuous(limits=c(1990, 2024), breaks = seq(1990, 2024, 3)) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank()) + labs(x = "Year", y = "Harvested Area (ha)") + 
+  scale_color_manual(name = "Harvested Area", values = colors)
+
+
+```
+
+
+
+
+COVID 5 year Scenario Analysis of Pesticide Spend on Corn in US
+
+```{r}
+
+pest_intercept <- -43030.68 #Found in AgriBenchmark Analysis
+pest_slope <- 189.65 #Found in Agribenchmark Analysis
+
+P_corn_2020_preCOVID <- 158
+GDP_corn_2020_preCOVID <- 21600000
+P_corn_2020_postCOVID <- 126
+GDP_corn_2020_postCOVID <-19700000
+
+df_covid <- df5_proj_vis
+
+df_covid <- df_covid %>%
+  mutate(Pred_pest_spend = NA,
+         Pred_pest_spend_covid = NA)
+
+
+
+df_pre_covid_pred <- data.frame("GDP_lag1" = GDP_corn_2020_preCOVID, "GDP_lag2" = GDP_corn_2020_preCOVID, "GDP_lag3" = GDP_corn_2020_preCOVID, "GDP_lag4" = GDP_corn_2020_preCOVID, "GDP_lag5" = GDP_corn_2020_preCOVID, "P_lag1" = P_corn_2020_preCOVID, "P_lag2" = P_corn_2020_preCOVID, "P_lag3" = P_corn_2020_preCOVID, "P_lag4" = P_corn_2020_preCOVID, "P_lag5" = P_corn_2020_preCOVID)
+
+df_pre_covid_pred <- df_pre_covid_pred %>% 
+  mutate(pred_2021 = predict(lm5_target_lag1, df_pre_covid_pred, type = "response"),
+         pred_2022 = predict(lm5_target_lag2, df_pre_covid_pred, type = "response"),
+         pred_2023 = predict(lm5_target_lag3, df_pre_covid_pred, type = "response"),
+         pred_2024 = predict(lm5_target_lag4, df_pre_covid_pred, type = "response"),
+         pred_2025 = predict(lm5_target_lag5, df_pre_covid_pred, type = "response"))
+
+
+df_post_covid_pred <- data.frame("GDP_lag1" = GDP_corn_2020_postCOVID, "GDP_lag2" = GDP_corn_2020_postCOVID, "GDP_lag3" = GDP_corn_2020_postCOVID, "GDP_lag4" = GDP_corn_2020_postCOVID, "GDP_lag5" = GDP_corn_2020_postCOVID, "P_lag1" = P_corn_2020_postCOVID, "P_lag2" = P_corn_2020_postCOVID, "P_lag3" = P_corn_2020_postCOVID, "P_lag4" = P_corn_2020_postCOVID, "P_lag5" = P_corn_2020_postCOVID)
+
+df_post_covid_pred <- df_post_covid_pred %>% 
+  mutate(pred_2021 = predict(lm5_target_lag1, df_post_covid_pred, type = "response"),
+         pred_2022 = predict(lm5_target_lag2, df_post_covid_pred, type = "response"),
+         pred_2023 = predict(lm5_target_lag3, df_post_covid_pred, type = "response"),
+         pred_2024 = predict(lm5_target_lag4, df_post_covid_pred, type = "response"),
+         pred_2025 = predict(lm5_target_lag5, df_post_covid_pred, type = "response"))
+
+df_covid_add <- data.frame("Year" = c(2021, 2022, 2023, 2024, 2025), 
+                           "pre_pred" = c(df_pre_covid_pred$pred_2021[1],
+                                          df_pre_covid_pred$pred_2022[1],
+                                          df_pre_covid_pred$pred_2023[1],
+                                          df_pre_covid_pred$pred_2024[1],
+                                          df_pre_covid_pred$pred_2025[1]),
+                           "post_pred" =  c(df_post_covid_pred$pred_2021[1],
+                                            df_post_covid_pred$pred_2022[1],
+                                            df_post_covid_pred$pred_2023[1],
+                                            df_post_covid_pred$pred_2024[1],
+                                            df_post_covid_pred$pred_2025[1]))
+
+df_covid_add
+
+df_covid_vis <- merge(df_covid, df_covid_add, by = "Year", all = TRUE)
+
+df_covid_vis
+
+summary(lm5_target_lag1)
+
+
+df_covid_vis <- df_covid_vis %>%
+  mutate(Pred_pest_spend = HarvestedArea*pest_slope + pest_intercept,
+         Pred_pest_spend_pre = pre_pred*pest_slope + pest_intercept,
+         Pred_pest_spend_covid = post_pred*pest_slope + pest_intercept)
+
+
+df_covid_vis$Pred_pest_spend[30] <- NA
+df_covid_vis$Pred_pest_spend[31] <- NA
+df_covid_vis$Pred_pest_spend[32] <- NA
+df_covid_vis$Pred_pest_spend[33] <- NA
+
+
+colors <- c("Model Estimate" = "black", "Pre COVID" = "steelblue", "Post COVID" = "darkred")
+ggplot(df_covid_vis, aes(x = Year)) + 
+  geom_line(aes(y = Pred_pest_spend, color = "Model Estimate")) + 
+  geom_line(aes(y = Pred_pest_spend_pre, color = "Pre COVID")) + 
+  geom_line(aes(y = Pred_pest_spend_covid, color = "Post COVID")) +
+  scale_x_continuous(limits=c(1990, 2028), breaks = seq(1990, 2028, 3)) + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank()) + labs(x = "Year", y = "Projected US Corn Pesticide Spend ($)") + 
+  scale_color_manual(name = "Predictions", values = colors)
+
+```
+
+
+#Weather Impact on Predictions
+##Combine weather datasets into one, add location data
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+Weather_all <- rbind(Weather1, Weather2, Weather3, Weather4)
+df_weather_bayer <- left_join(Weather_all, fips, by = "fips") %>% 
+  select(-X)
+```
+
+##Add weather in heartland to df_lm
+Since this model is focused on corn, grown mostly in the heartland, we use the average precipitation in the heartland. 
+```{r}
+df_weather_bayer <- df_weather_bayer %>% 
+  mutate (Month_name = if_else(Month == 1, "Jan",
+                       if_else(Month == 2, "Feb",
+                       if_else(Month == 3, "Mar",
+                       if_else(Month == 4, "Apr",
+                       if_else(Month == 5, "May",
+                       if_else(Month == 6, "Jun",
+                       if_else(Month == 7, "Jul",
+                       if_else(Month == 8, "Aug",
+                       if_else(Month == 9, "Sep",
+                       if_else(Month == 10, "Oct",
+                       if_else(Month == 11, "Nov",
+                       if_else(Month == 12, "Dec", "")))))))))))))
+
+df_weather_bayer$Month_name <- ordered(df_weather_bayer$Month_name, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+
+
+# Heartland weather
+df_weather_bayer_heartland <- df_weather_bayer %>% 
+  filter(state_abbr == "IA" | state_abbr == "MO" | state_abbr == "IL" | state_abbr == "IN" | state_abbr == "OH") %>% 
+  group_by(state_abbr, Year, Month_name) %>%                       # First average by state 
+  summarize(PRCP = mean(total_precipitation, na.rm = TRUE)) %>% 
+  group_by(Year, Month_name) %>%                                   # Then average across heartland states
+  summarize(PRCP = mean(PRCP, na.rm = TRUE))
+
+# for regressions with monthly weather data vs annual farm data by state
+df_weather_bayer_heartland_wide <- pivot_wider(data = df_weather_bayer_heartland, names_from = Month_name, values_from = PRCP)
+df_weather_bayer_heartland_wide <- df_weather_bayer_heartland_wide %>%
+  mutate(Annual = Jan + Feb + Mar + Apr + May + Jun + Jul + Aug + Sep + Oct + Nov + Dec)
+```
+
+
+##Model building
+Filter datasets to analyze, with weather
+```{r}
+df_lm_weather <- inner_join(df_lm, df_weather_bayer_heartland_wide, by = "Year")
+df_lm_weather <- df_lm_weather %>%
+  mutate(Annual_lag1 = lag(Annual,1))
+
+lm_target_weather_original <- lm(HarvestedArea ~ HA_lag1 + Cropland_lag1 + Price_lag1 + 
+                                   GDP_lag1 + Pop_lag1, df_lm_weather)
+lm_target_weather_annual <- lm(HarvestedArea ~ HA_lag1 + Cropland_lag1 + Price_lag1 + 
+                                 GDP_lag1 + Pop_lag1 + Annual, df_lm_weather)
+lm_target_weather_annual_lag1 <- lm(HarvestedArea ~ HA_lag1 + Cropland_lag1 + Price_lag1 + 
+                                      GDP_lag1 + Pop_lag1 + Annual_lag1, df_lm_weather)
+lm_target_weather_month <- lm(HarvestedArea ~ . - Year -Annual -Annual_lag1, df_lm_weather)
+
+summary(lm_target_weather_original) #Without weather
+summary(lm_target_weather_annual) #With non-lagged annual weather
+summary(lm_target_weather_annual_lag1) #With 1 year lagged annual weather
+summary(lm_target_weather_month) #With non-lagged monthly weather
+```
+
+Looking at R-squared values, addition of lagged weather increased the R-squared from 0.845 to 0.9247.
+
+
+Attempt with fewer variables, with weather
+```{r}
+new_form_weather_original <- formula(HarvestedArea ~  Price_lag1 + GDP_lag1)
+lm_target_weather_original <- lm(new_form_weather_original, df_lm_weather)
+
+
+new_form_weather_annual <- formula(HarvestedArea ~  Price_lag1 + GDP_lag1 + Annual)
+lm_target_weather_annual <- lm(new_form_weather_annual, df_lm_weather)
+
+
+new_form_weather_lag1 <- formula(HarvestedArea ~  Price_lag1 + GDP_lag1 + Annual_lag1)
+lm_target_weather_lag1 <- lm(new_form_weather_lag1, df_lm_weather)
+
+
+new_form_weather_pop <- formula(HarvestedArea ~  Price_lag1 + GDP_lag1 + Pop_lag1)
+lm_target_weather_pop <- lm(new_form_weather_pop, df_lm_weather)
+
+
+new_form_weather_crop <- formula(HarvestedArea ~  Price_lag1 + GDP_lag1 + Cropland_lag1)
+lm_target_weather_crop <- lm(new_form_weather_crop, df_lm_weather)
+
+summary(lm_target_weather_original) #Without weather
+summary(lm_target_weather_annual) #With non-lagged annual weather
+summary(lm_target_weather_lag1) #With 1 year lagged annual weather
+#Replace weather variable with non-weather variable to understand if R-squared improvement is due to weather or due to one increase in any variable
+summary(lm_target_weather_pop) #With 1 year lagged population in place of weather
+summary(lm_target_weather_crop) #With 1 year lagged cropland in place of weather
+```
+
+We still see that lagged-weather provides the highest R-squared of 0.9116.
+
+
+Split Test and train and check prediction, with weather
+```{r}
+#train 2000-2013, test 2014-2018
+df_lm_weather_train <- df_lm_weather %>%
+  filter(Year <= 2013)
+
+
+df_lm_weather_test <- df_lm_weather %>%
+  filter(Year > 2013)
+
+lm_target_weather_train_original <- lm(new_form_weather_original, df_lm_weather_train)
+lm_target_weather_train_lag1 <- lm(new_form_weather_lag1, df_lm_weather_train)
+
+
+summary(lm_target_weather_train_original)
+summary(lm_target_weather_train_lag1)
+
+df_lm_weather <- df_lm_weather %>%
+  mutate(pred_original = predict(lm_target_weather_train_original, df_lm_weather, type = "response"),
+         pred_lag1 = predict(lm_target_weather_train_lag1, df_lm_weather, type = "response"))
+
+
+df_lm_weather <- df_lm_weather %>%
+  mutate(diff_percent_original = (pred_original - HarvestedArea)/HarvestedArea,
+         abs_diff_percent_original = abs(pred_original - HarvestedArea)/HarvestedArea,
+         diff_percent_lag1 = (pred_lag1 - HarvestedArea)/HarvestedArea,
+         abs_diff_percent_lag1 = abs(pred_lag1 - HarvestedArea)/HarvestedArea)
+
+#glimpse(df_lm_weather)
+
+df_lm_weather %>%
+  filter(Year > 2013) %>%
+  summarize(av_error_original = mean(abs_diff_percent_original),
+            av_error_lag1 = mean(abs_diff_percent_lag1))
+
+colors2 <- c("Actual" = "black", "Original" = "steelblue", "With weather" = "red")
+ggplot(df_lm_weather, aes(x = Year)) + 
+  geom_line(aes(y = HarvestedArea, color = "Actual")) + 
+  geom_line(aes(y = pred_original, color = "Original")) + 
+  geom_line(aes(y = pred_lag1, color = "With weather")) +
+  scale_color_manual(name = "Harvested Area", values = colors2) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank()) +
+  labs(x = "Year", y = "Harvested Area (ha)")
+```
+
+By adding lagged weather, we see that the model performs significantly better during spikes (2007, 2015) when we include weather.
+
+
+#Price Analysis
+***
+##LASSO Models US (Maize)
+```{r, echo=FALSE, message=FALSE, warning=FALSE ,fig.height=8, fig.width=16}
+df_us_prices <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Price')) %>%
+  mutate(Item = paste(Item,"_price",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_prod <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Production')) %>%
+  mutate(Item = paste(Item,"_prod",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_HA <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','HarvestedArea')) %>%
+  mutate(Item = paste(Item,"_HA",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_yield <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Yield')) %>%
+  mutate(Item = paste(Item,"_yield",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_arms_expanded<-df_ARMS_expanded %>% filter(crop=="Corn", farm_resource_region=="Heartland") %>% 
+  select(c('year','stat','estimate')) %>%
+  cast(year~stat)
+names(df_us_arms_expanded)[1]<-'Year'
+df_us_prices_2 <- df_us_prices %>%
+  left_join(df_us_prod, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_us_HA, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_us_yield, by=c('Area.Code','Area','Year')) %>%
+  left_join(df_fao_data_macro, by=c('Area.Code','Year')) %>% 
+  left_join(df_us_arms_expanded, by=('Year')) %>%
+  mutate(Maize_price_1 = lag(Maize_price,1), Maize_prod_1 = lag(Maize_prod,1), 
+         Maize_yield_1 = lag(Maize_yield,1), Maize_HA_1 = lag(Maize_HA,1), 
+         Soybeans_price_1 = lag(Soybeans_price,1), Soybeans_prod_1 = lag(Soybeans_prod,1), 
+         Soybeans_yield_1 = lag(Soybeans_yield,1), Soybeans_HA_1 = lag(Soybeans_HA,1), 
+         Wheat_price_1 = lag(Wheat_price,1), Wheat_prod_1 = lag(Wheat_prod,1), 
+         Wheat_yield_1 = lag(Wheat_yield,1), Wheat_HA_1 = lag(Wheat_HA,1),
+         GDP = lag(GDP,1),Gross.Fixed.Capital.Formation = lag(Gross.Fixed.Capital.Formation,1),
+         Value.Added_Agriculture_Forestry_Fishing = lag(Value.Added_Agriculture_Forestry_Fishing,1),
+         Employment_Agriculture = lag(Employment_Agriculture,1), 
+         Share.Employment_Agriculture = lag(Share.Employment_Agriculture,1),
+         Agricultural.land = lag(Agricultural.land,1), Arable.land = lag(Arable.land,1),
+         Cropland = lag(Cropland,1), Forest.land = lag(Forest.land,1), Inland.waters = lag(Inland.waters,1),
+         Land.area = lag(Land.area,1), Land.area.equipped.for.irrigation = lag(Land.area.equipped.for.irrigation,1),
+         Land.under.permanent.crops = lag(Land.under.permanent.crops,1),
+         efrent=lag(efrent,1), eftot=lag(eftot,1), endepr=lag(endepr,1),
+         evtot=lag(evtot,1), icrop=lag(icrop,1),incfi=lag(incfi,1),
+         Price = Maize_price) %>%
+  filter(is.na(Price)==FALSE) %>% 
+  select(c('Year','Price','Maize_price_1','Maize_prod_1','Maize_yield_1','Maize_HA_1','Soybeans_price_1',
+           'Soybeans_prod_1','Soybeans_yield_1','Soybeans_HA_1','Wheat_price_1','Wheat_prod_1','Wheat_yield_1',
+           'Wheat_HA_1','GDP','Gross.Fixed.Capital.Formation','Value.Added_Agriculture_Forestry_Fishing',
+           'Population','Employment_Agriculture','Share.Employment_Agriculture','Agricultural.land',
+           'Arable.land','Country.area','Cropland','Forest.land','Inland.waters','Land.area',
+           'Land.area.equipped.for.irrigation','Land.under.permanent.crops',
+           'efrent', 'eftot', 'endepr', 'evtot', 'icrop', 'incfi')) %>%
+  filter(is.na(Maize_price_1)==FALSE,is.na(Soybeans_price_1)==FALSE,is.na(Wheat_price_1)==FALSE, is.na(incfi)==FALSE)
+
+df_us_prices_2_train<-df_us_prices_2 %>% filter(Year<=2007)
+
+X <- sparse.model.matrix(Price ~Year+ (log(Maize_price_1)+log(Maize_prod_1)+log(Maize_yield_1)+log(Maize_HA_1)+log(Soybeans_price_1)+log(Soybeans_prod_1)+log(Soybeans_yield_1)+log(Soybeans_HA_1)+log(Wheat_price_1)+log(Wheat_prod_1)+log(Wheat_yield_1)+log(Wheat_HA_1)+log(GDP)+log(Gross.Fixed.Capital.Formation)+log(Value.Added_Agriculture_Forestry_Fishing)+log(Population)+log(efrent)+log(eftot)+log(endepr)+log(evtot)+log(icrop)+log(incfi))^2, data = df_us_prices_2)[,-1]
+y<-log(df_us_prices_2$Price)
+
+model<-gamlr(X,y,family ="gaussian", lmr=1e-4,nlambda = 1000)
+plot(model)
+betas<-coef(model)
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response")
+df_us_prices_2$predict_price<-exp(p@x)
+model_fit<-summary(model)
+iter<-which.min(model_fit$aicc)
+print(model_fit[iter,])
+df_us_prices_2 %>% ggplot(aes(x=Year)) +
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price), size=2, colour = bayer_cols('light_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Maize price in the US", subtitle = "Actual price: green line, Predicted price: blue line",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+  
+
+model<-cv.gamlr(X,y,family ="gaussian", nfold = 2, nlambda = 1000)
+plot(model)
+betas<-coef(model,select = 'min')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "min")
+df_us_prices_2$predict_price_min<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.min
+print(model_fit[iter,])
+betas<-coef(model,select = '1se')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "1se")
+df_us_prices_2$predict_price_1se<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.1se
+print(model_fit[iter,])
+df_us_prices_2 %>% ggplot(aes(x=Year)) + 
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price_min), size=2, colour = bayer_cols('light_blue')) + 
+    geom_line(aes(y=predict_price_1se), size=2, colour = bayer_cols('dark_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Maize price in the US", subtitle = "Actual price: green line, Predicted price: blue lines",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+  
+```
+
+##LASSO Models US (Soybeans)
+```{r, echo=FALSE, message=FALSE, warning=FALSE ,fig.height=8, fig.width=16}
+df_us_prices <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Price')) %>%
+  mutate(Item = paste(Item,"_price",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_prod <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Production')) %>%
+  mutate(Item = paste(Item,"_prod",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_HA <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','HarvestedArea')) %>%
+  mutate(Item = paste(Item,"_HA",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_yield <- df_fao_data_crops %>% filter(Area.Code %in% c(231), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Yield')) %>%
+  mutate(Item = paste(Item,"_yield",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+df_us_arms_expanded<-df_ARMS_expanded %>% filter(crop=="Corn", farm_resource_region=="Heartland") %>% 
+  select(c('year','stat','estimate')) %>%
+  cast(year~stat)
+names(df_us_arms_expanded)[1]<-'Year'
+df_us_prices_2 <- df_us_prices %>%
+  left_join(df_us_prod, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_us_HA, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_us_yield, by=c('Area.Code','Area','Year')) %>%
+  left_join(df_fao_data_macro, by=c('Area.Code','Year')) %>% 
+  left_join(df_us_arms_expanded, by=('Year')) %>%
+  mutate(Maize_price_1 = lag(Maize_price,1), Maize_prod_1 = lag(Maize_prod,1), 
+         Maize_yield_1 = lag(Maize_yield,1), Maize_HA_1 = lag(Maize_HA,1), 
+         Soybeans_price_1 = lag(Soybeans_price,1), Soybeans_prod_1 = lag(Soybeans_prod,1), 
+         Soybeans_yield_1 = lag(Soybeans_yield,1), Soybeans_HA_1 = lag(Soybeans_HA,1), 
+         Wheat_price_1 = lag(Wheat_price,1), Wheat_prod_1 = lag(Wheat_prod,1), 
+         Wheat_yield_1 = lag(Wheat_yield,1), Wheat_HA_1 = lag(Wheat_HA,1),
+         GDP = lag(GDP,1),Gross.Fixed.Capital.Formation = lag(Gross.Fixed.Capital.Formation,1),
+         Value.Added_Agriculture_Forestry_Fishing = lag(Value.Added_Agriculture_Forestry_Fishing,1),
+         Employment_Agriculture = lag(Employment_Agriculture,1), 
+         Share.Employment_Agriculture = lag(Share.Employment_Agriculture,1),
+         Agricultural.land = lag(Agricultural.land,1), Arable.land = lag(Arable.land,1),
+         Cropland = lag(Cropland,1), Forest.land = lag(Forest.land,1), Inland.waters = lag(Inland.waters,1),
+         Land.area = lag(Land.area,1), Land.area.equipped.for.irrigation = lag(Land.area.equipped.for.irrigation,1),
+         Land.under.permanent.crops = lag(Land.under.permanent.crops,1),
+         efrent=lag(efrent,1), eftot=lag(eftot,1), endepr=lag(endepr,1),
+         evtot=lag(evtot,1), icrop=lag(icrop,1),incfi=lag(incfi,1),
+         Price = Soybeans_price) %>%
+  filter(is.na(Price)==FALSE) %>% 
+  select(c('Year','Price','Maize_price_1','Maize_prod_1','Maize_yield_1','Maize_HA_1','Soybeans_price_1',
+           'Soybeans_prod_1','Soybeans_yield_1','Soybeans_HA_1','Wheat_price_1','Wheat_prod_1','Wheat_yield_1',
+           'Wheat_HA_1','GDP','Gross.Fixed.Capital.Formation','Value.Added_Agriculture_Forestry_Fishing',
+           'Population','Employment_Agriculture','Share.Employment_Agriculture','Agricultural.land',
+           'Arable.land','Country.area','Cropland','Forest.land','Inland.waters','Land.area',
+           'Land.area.equipped.for.irrigation','Land.under.permanent.crops',
+           'efrent', 'eftot', 'endepr', 'evtot', 'icrop', 'incfi')) %>%
+  filter(is.na(Maize_price_1)==FALSE,is.na(Soybeans_price_1)==FALSE,is.na(Wheat_price_1)==FALSE, is.na(incfi)==FALSE)
+
+X <- sparse.model.matrix(Price ~ (log(Maize_price_1)+log(Maize_prod_1)+log(Maize_yield_1)+log(Maize_HA_1)+log(Soybeans_price_1)+log(Soybeans_prod_1)+log(Soybeans_yield_1)+log(Soybeans_HA_1)+log(Wheat_price_1)+log(Wheat_prod_1)+log(Wheat_yield_1)+log(Wheat_HA_1)+log(GDP)+log(Gross.Fixed.Capital.Formation)+log(Value.Added_Agriculture_Forestry_Fishing)+log(Population)+log(efrent)+log(eftot)+log(endepr)+log(evtot)+log(icrop)+log(incfi))^2, data = df_us_prices_2)[,-1]
+y<-log(df_us_prices_2$Price)
+model<-gamlr(X,y,family ="gaussian", lmr=1e-4,nlambda = 1000)
+plot(model)
+betas<-coef(model)
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response")
+df_us_prices_2$predict_price<-exp(p@x)
+model_fit<-summary(model)
+iter<-which.min(model_fit$aicc)
+print(model_fit[iter,])
+df_us_prices_2 %>% ggplot(aes(x=Year)) +
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price), size=2, colour = bayer_cols('light_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Soybeans price in the US", subtitle = "Actual price: green line, Predicted price: blue line",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+  
+
+model<-cv.gamlr(X,y,family ="gaussian", nfold = 2, nlambda = 1000)
+plot(model)
+betas<-coef(model,select = 'min')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "min")
+df_us_prices_2$predict_price_min<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.min
+print(model_fit[iter,])
+betas<-coef(model,select = '1se')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "1se")
+df_us_prices_2$predict_price_1se<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.1se
+print(model_fit[iter,])
+df_us_prices_2 %>% ggplot(aes(x=Year)) + 
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price_min), size=2, colour = bayer_cols('light_blue')) + 
+    geom_line(aes(y=predict_price_1se), size=2, colour = bayer_cols('dark_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Soybeans price in the US", subtitle = "Actual price: green line, Predicted price: blue lines",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+  
+```
+
+##LASSO Models  Continent (Maize)
+```{r, echo=FALSE, message=FALSE, warning=FALSE ,fig.height=8, fig.width=16}
+df_rgn_prices <- df_fao_data_crops %>% filter(Area.Code %in% c(5100,5200,5300,5400,5500), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Price')) %>%
+  mutate(Item = paste(Item,"_price",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_prod <- df_fao_data_crops %>% filter(Area.Code %in%  c(5100,5200,5300,5400,5500), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Production')) %>%
+  mutate(Item = paste(Item,"_prod",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_HA <- df_fao_data_crops %>% filter(Area.Code %in%  c(5100,5200,5300,5400,5500), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','HarvestedArea')) %>%
+  mutate(Item = paste(Item,"_HA",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_yield <- df_fao_data_crops %>% filter(Area.Code %in%  c(5100,5200,5300,5400,5500), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Yield')) %>%
+  mutate(Item = paste(Item,"_yield",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_prices_2 <- df_rgn_prices %>%
+  left_join(df_rgn_prod, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_rgn_HA, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_rgn_yield, by=c('Area.Code','Area','Year')) %>%
+  left_join(df_fao_data_macro, by=c('Area.Code','Year')) %>% 
+  mutate(Maize_price_1 = lag(Maize_price,1), Maize_prod_1 = lag(Maize_prod,1), 
+         Maize_yield_1 = lag(Maize_yield,1), Maize_HA_1 = lag(Maize_HA,1), 
+         Soybeans_price_1 = lag(Soybeans_price,1), Soybeans_prod_1 = lag(Soybeans_prod,1), 
+         Soybeans_yield_1 = lag(Soybeans_yield,1), Soybeans_HA_1 = lag(Soybeans_HA,1), 
+         Wheat_price_1 = lag(Wheat_price,1), Wheat_prod_1 = lag(Wheat_prod,1), 
+         Wheat_yield_1 = lag(Wheat_yield,1), Wheat_HA_1 = lag(Wheat_HA,1),
+         GDP = lag(GDP,1),Gross.Fixed.Capital.Formation = lag(Gross.Fixed.Capital.Formation,1),
+         Value.Added_Agriculture_Forestry_Fishing = lag(Value.Added_Agriculture_Forestry_Fishing,1),
+         Employment_Agriculture = lag(Employment_Agriculture,1), 
+         Share.Employment_Agriculture = lag(Share.Employment_Agriculture,1),
+         Agricultural.land = lag(Agricultural.land,1), Arable.land = lag(Arable.land,1),
+         Cropland = lag(Cropland,1), Forest.land = lag(Forest.land,1), Inland.waters = lag(Inland.waters,1),
+         Land.area = lag(Land.area,1), Land.area.equipped.for.irrigation = lag(Land.area.equipped.for.irrigation,1),
+         Land.under.permanent.crops = lag(Land.under.permanent.crops,1), 
+         Price = Maize_price) %>%
+  filter(is.na(Price)==FALSE) %>% 
+  select(c('Year','Area.x','Price','Maize_price_1','Maize_prod_1','Maize_yield_1','Maize_HA_1',
+           'Soybeans_price_1','Soybeans_prod_1','Soybeans_yield_1','Soybeans_HA_1','Wheat_price_1',
+           'Wheat_prod_1','Wheat_yield_1','Wheat_HA_1','GDP','Gross.Fixed.Capital.Formation',
+           'Value.Added_Agriculture_Forestry_Fishing','Population','Employment_Agriculture',
+           'Share.Employment_Agriculture','Agricultural.land','Arable.land','Country.area',
+           'Cropland','Forest.land','Inland.waters','Land.area','Land.area.equipped.for.irrigation',
+           'Land.under.permanent.crops')) %>%
+  filter(is.na(Maize_price_1)==FALSE,is.na(Soybeans_price_1)==FALSE,is.na(Wheat_price_1)==FALSE)
+
+X <- sparse.model.matrix(Price ~ (Area.x+log(Maize_price_1)+log(Maize_prod_1)+log(Maize_yield_1)+log(Maize_HA_1)+log(Soybeans_price_1)+log(Soybeans_prod_1)+log(Soybeans_yield_1)+log(Soybeans_HA_1)+log(Wheat_price_1)+log(Wheat_prod_1)+log(Wheat_yield_1)+log(Wheat_HA_1)+log(GDP)+log(Gross.Fixed.Capital.Formation)+log(Value.Added_Agriculture_Forestry_Fishing)+log(Population))^2, data = df_rgn_prices_2)[,-1]
+y<-log(df_rgn_prices_2$Price)
+model<-gamlr(X,y,family ="gaussian", lmr=1e-4, nlambda = 1000)
+plot(model)
+betas<-coef(model)
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+
+p <- predict(model, X, type="response")
+df_rgn_prices_2$predict_price<-exp(p@x)
+
+model_fit<-summary(model)
+iter<-which.min(model_fit$aicc)
+print(model_fit[iter,])
+
+df_rgn_prices_2 %>% ggplot(aes(x=Year)) + 
+  facet_wrap(.~Area.x,scales = "free", ncol = 3) + 
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price), size=2, colour = bayer_cols('light_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Maize price", subtitle = "Actual price: green line, Predicted price: blue line",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+
+model<-cv.gamlr(X,y,family ="gaussian", nfold = 2, nlambda = 1000)
+plot(model)
+betas<-coef(model,select = 'min')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "min")
+df_rgn_prices_2$predict_price_min<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.min
+print(model_fit[iter,])
+betas<-coef(model,select = '1se')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "1se")
+df_rgn_prices_2$predict_price_1se<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.1se
+print(model_fit[iter,])
+df_rgn_prices_2 %>% ggplot(aes(x=Year)) + 
+  facet_wrap(.~Area.x,scales = "free", ncol = 3) + 
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price_min), size=2, colour = bayer_cols('light_blue')) + 
+    geom_line(aes(y=predict_price_1se), size=2, colour = bayer_cols('dark_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Maize price", subtitle = "Actual price: green line, Predicted price: blue lines",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+
+
+
+```
+
+##LASSO Models Region (Soybeans)
+```{r, echo=FALSE, message=FALSE, warning=FALSE ,fig.height=8, fig.width=16}
+df_rgn_prices <- df_fao_data_crops %>% filter(Area.Code %in% c(5101,5102,5103,5104,5105,5203,5204,5206,5207,5301,5302,5303,5304,5305,5401,5402,5403,5404,5501,5502,5503,5504), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Price')) %>%
+  mutate(Item = paste(Item,"_price",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_prod <- df_fao_data_crops %>% filter(Area.Code %in% c(5101,5102,5103,5104,5105,5203,5204,5206,5207,5301,5302,5303,5304,5305,5401,5402,5403,5404,5501,5502,5503,5504), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Production')) %>%
+  mutate(Item = paste(Item,"_prod",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_HA <- df_fao_data_crops %>% filter(Area.Code %in% c(5101,5102,5103,5104,5105,5203,5204,5206,5207,5301,5302,5303,5304,5305,5401,5402,5403,5404,5501,5502,5503,5504), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','HarvestedArea')) %>%
+  mutate(Item = paste(Item,"_HA",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_yield <- df_fao_data_crops %>% filter(Area.Code %in% c(5101,5102,5103,5104,5105,5203,5204,5206,5207,5301,5302,5303,5304,5305,5401,5402,5403,5404,5501,5502,5503,5504), Item.Code %in% c(15,56,236)) %>%
+  select(c('Area.Code','Area','Item','Year','Yield')) %>%
+  mutate(Item = paste(Item,"_yield",sep="")) %>%
+  cast(Area.Code+Area+Year~Item)
+
+df_rgn_prices_2 <- df_rgn_prices %>%
+  left_join(df_rgn_prod, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_rgn_HA, by=c('Area.Code','Area','Year')) %>% 
+  left_join(df_rgn_yield, by=c('Area.Code','Area','Year')) %>%
+  left_join(df_fao_data_macro, by=c('Area.Code','Year')) %>% 
+  mutate(Maize_price_1 = lag(Maize_price,1), Maize_prod_1 = lag(Maize_prod,1), 
+         Maize_yield_1 = lag(Maize_yield,1), Maize_HA_1 = lag(Maize_HA,1), 
+         Soybeans_price_1 = lag(Soybeans_price,1), Soybeans_prod_1 = lag(Soybeans_prod,1), 
+         Soybeans_yield_1 = lag(Soybeans_yield,1), Soybeans_HA_1 = lag(Soybeans_HA,1), 
+         Wheat_price_1 = lag(Wheat_price,1), Wheat_prod_1 = lag(Wheat_prod,1), 
+         Wheat_yield_1 = lag(Wheat_yield,1), Wheat_HA_1 = lag(Wheat_HA,1),
+         GDP = lag(GDP,1),Gross.Fixed.Capital.Formation = lag(Gross.Fixed.Capital.Formation,1),
+         Value.Added_Agriculture_Forestry_Fishing = lag(Value.Added_Agriculture_Forestry_Fishing,1),
+         Employment_Agriculture = lag(Employment_Agriculture,1), 
+         Share.Employment_Agriculture = lag(Share.Employment_Agriculture,1),
+         Agricultural.land = lag(Agricultural.land,1), Arable.land = lag(Arable.land,1),
+         Cropland = lag(Cropland,1), Forest.land = lag(Forest.land,1), Inland.waters = lag(Inland.waters,1),
+         Land.area = lag(Land.area,1), Land.area.equipped.for.irrigation = lag(Land.area.equipped.for.irrigation,1),
+         Land.under.permanent.crops = lag(Land.under.permanent.crops,1), 
+         Price = Soybeans_price) %>%
+  filter(is.na(Price)==FALSE) %>% 
+  select(c('Year','Area.x','Price','Maize_price_1','Maize_prod_1','Maize_yield_1','Maize_HA_1',
+           'Soybeans_price_1','Soybeans_prod_1','Soybeans_yield_1','Soybeans_HA_1','Wheat_price_1',
+           'Wheat_prod_1','Wheat_yield_1','Wheat_HA_1','GDP','Gross.Fixed.Capital.Formation',
+           'Value.Added_Agriculture_Forestry_Fishing','Population','Employment_Agriculture',
+           'Share.Employment_Agriculture','Agricultural.land','Arable.land','Country.area',
+           'Cropland','Forest.land','Inland.waters','Land.area','Land.area.equipped.for.irrigation',
+           'Land.under.permanent.crops')) %>%
+  filter(is.na(Maize_price_1)==FALSE,is.na(Soybeans_price_1)==FALSE,is.na(Wheat_price_1)==FALSE)
+
+X <- sparse.model.matrix(Price ~ (Area.x+log(Maize_price_1)+log(Maize_prod_1)+log(Maize_yield_1)+log(Maize_HA_1)+log(Soybeans_price_1)+log(Soybeans_prod_1)+log(Soybeans_yield_1)+log(Soybeans_HA_1)+log(Wheat_price_1)+log(Wheat_prod_1)+log(Wheat_yield_1)+log(Wheat_HA_1)+log(GDP)+log(Gross.Fixed.Capital.Formation)+log(Value.Added_Agriculture_Forestry_Fishing)+log(Population))^2, data = df_rgn_prices_2)[,-1]
+y<-log(df_rgn_prices_2$Price)
+model<-gamlr(X,y,family ="gaussian", lmr=1e-4, nlambda = 1000)
+plot(model)
+betas<-coef(model)
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+
+p <- predict(model, X, type="response")
+df_rgn_prices_2$predict_price<-exp(p@x)
+
+model_fit<-summary(model)
+iter<-which.min(model_fit$aicc)
+print(model_fit[iter,])
+
+df_rgn_prices_2 %>% ggplot(aes(x=Year)) + 
+  facet_wrap(.~Area.x,scales = "free", ncol = 3) + 
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price), size=2, colour = bayer_cols('light_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Soybeans price", subtitle = "Actual price: green line, Predicted price: blue line",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+
+model<-cv.gamlr(X,y,family ="gaussian", nfold = 2, nlambda = 1000)
+plot(model)
+betas<-coef(model,select = 'min')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "min")
+df_rgn_prices_2$predict_price_min<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.min
+print(model_fit[iter,])
+betas<-coef(model,select = '1se')
+aux<-data.frame(cbind(betas@Dimnames[[1]][betas@i+1],betas@x))
+names(aux)<-c('Variable','Beta')
+aux %>% kable()
+p <- predict(model, X, type="response", select = "1se")
+df_rgn_prices_2$predict_price_1se<-exp(p@x)
+model_fit<-summary(model)
+iter<-model$seg.1se
+print(model_fit[iter,])
+df_rgn_prices_2 %>% ggplot(aes(x=Year)) + 
+  facet_wrap(.~Area.x,scales = "free", ncol = 3) + 
+  geom_line(aes(y=Price), size=2, colour = bayer_cols('light_green')) + 
+  geom_line(aes(y=predict_price_min), size=2, colour = bayer_cols('light_blue')) + 
+    geom_line(aes(y=predict_price_1se), size=2, colour = bayer_cols('dark_blue')) + 
+  scale_x_continuous(breaks=seq(1992,2017,1))+
+  labs(title= "Soybeans price", subtitle = "Actual price: green line, Predicted price: blue lines",
+       caption="Source: self-elaboration based on FAO's dataset",
+       x="Year",y="USD/tonne", colour=" ", fill=" ")+
+  theme(panel.grid.major = element_blank(), panel.background = element_blank(), legend.position = "top") +
+  theme(axis.line = element_line(colour = "black", size = 0.5, linetype = "solid")) +
+  theme(axis.text.x = element_text(color = "grey20", size = 10, angle = 0, hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 10, angle = 0, hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 15, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 15, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        plot.subtitle =element_text(color = "grey20", size =15, angle = 0, hjust = 0, vjust = .5, face = "plain"),
+        plot.title =element_text(color = "grey20", size = 20, angle = 0, hjust = 0, vjust = .5, face = "bold"),
+        plot.caption =element_text(color = "grey20", size = 8))
+
+
+
+```
+
+#Connecting curated data to public data 
+
+## Agribenchmark Data Set-up
+Creating relevant US Subset of agribenchmark
+```{r}
+df_US_All_raw <- df_agribenchmark %>% 
+  filter(Nation2 == "US") %>% 
+  mutate(Tot_Profit = Acreage*Profit,
+         Tot_Sales = Acreage*`Gross revenue`)
+```
+
+Converting several key columns from wide to long format for future analysis.
+```{r}
+df_US_All <- df_US_All_raw %>% 
+  gather(Input_NPK, NPK_tonnes, `N-Input`, `P-Input`,`K-Input`) %>%  #NPK in Long Format
+  gather(Input_Cost_Buckets, ExpPerAcre, Seeds, Fertilizer, Pesticides) %>%  #Input Costs in Long Format
+  gather(Financial_Type, Fin_values, `Gross revenue`, `Gross Margin 1`, `Gross margin 2`, Profit, `Crop establishment cost`, `Direct cost`, `Operating cost`, `Total cost`) #Profitability figures in long format
+```
+
+Creating US subsets for input analysis.
+```{r}
+US_NPK <- df_US_All %>% 
+  select(`Farm name`, `Result year`, `Crop level 2`, Acreage, Input_NPK, NPK_tonnes)
+
+US_Input_Costs <- df_US_All %>% 
+  select(`Farm name`, `Result year`, `Crop level 2`, Acreage, Input_Cost_Buckets, ExpPerAcre)
+```
+
+
+## Analysis of NPK to demonstrate need for grids: Farm x Crop
+
+Aggregate NPK is not sufficient.
+```{r}
+US_NPK %>% 
+  ggplot(aes(x = `Result year`, y = NPK_tonnes, color = Input_NPK)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    ggtitle("US Fertilizer Inputs (t/ha)") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue()
+    #geom_smooth(aes(group = 1), se = FALSE, linetype = 2)
+
+```
+
+This graph demonstrates the importance of crop specific practices, but it's not enough.
+```{r}
+US_NPK %>% 
+  ggplot(aes(x = `Result year`, y = NPK_tonnes, color = Input_NPK)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    facet_grid(. ~`Crop level 2`) +
+    ggtitle("US Fertilizer Inputs by Crop (t/ha)") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue()
+    #geom_smooth(aes(group = 1), se = FALSE, linetype = 2)
+```
+
+
+This graph demonstrates the importance of farm/region specific practices, but it's not enough.
+```{r}
+US_NPK %>% 
+  ggplot(aes(x = `Result year`, y = NPK_tonnes, color = Input_NPK)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    facet_grid(. ~`Farm name`) +
+    ggtitle("US Fertilizer Inputs by Farm (t/ha)") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue()
+    #geom_smooth(aes(group = 1), se = FALSE, linetype = 2)
+```
+
+This grid is needed to understand granular farm practices. It also leads to limited data: 1 useful data point per farm per year.
+```{r}
+US_NPK %>% 
+  ggplot(aes(x = `Result year`, y = NPK_tonnes, color = Input_NPK)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    facet_grid(vars(`Crop level 2`),vars(`Farm name`)) +
+    ggtitle("US Fertilizer Inputs by Farm & Crop") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue() 
+    #geom_smooth(aes(group = 1), se = FALSE, linetype = 2)
+```
+
+
+## ARMS Data Set-up via API
+The necessary dataframes have all been loaded in the initial chuncks. Therefore, you do not need to execute the code in this section.
+
+If you are interested in running the API, you can register for a personal key via this link https://api.data.gov/
+
+Once a key is received, enter it between the quotations in the "myKey" variable below.
+
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+myKey <- "" #insert personal key from USDA here
+
+api_endpoints <- list(reports = "https://api.ers.usda.gov/data/arms/report",
+                      categories = "https://api.ers.usda.gov/data/arms/category",
+                      survey = "https://api.ers.usda.gov/data/arms/surveydata",
+                      variables = "https://api.ers.usda.gov/data/arms/variable")
+
+```
+
+### Creating the main ARMS dataset
+```{r}
+#NET CASH INCOME
+filters_cat <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "incfi",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_cat,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_inc_cat <- table[order(table$category_value, table$year), ]
+
+#NET INCOME
+filters_netinc <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "infi",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_netinc,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_inc_netinc <- table[order(table$category_value, table$year), ]
+
+
+#DEPRECIATION
+filters_cat <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "endepr",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_cat,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_depr_cat <- table[order(table$category_value, table$year), ]
+
+#LEASES
+filters_cat <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "efrent",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_cat,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_lease_cat <- table[order(table$category_value, table$year), ]
+
+#CROP SALES
+filters_sales <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "icrop",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_sales,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_sales <- table[order(table$category_value, table$year), ]
+
+#VARIABLE EXPENSES
+filters_variable <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "evtot",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_variable,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_varexp <- table[order(table$category_value, table$year), ]
+
+#FIXED EXPENSES
+filters_fixed <- list(
+    "year" = 1996:2018,
+    "state" = "all",
+    "report" = "Farm Business Income Statement",
+    "variable" = "eftot",
+    "category" = "Farm Resource Region",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_fixed,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_fixedexp <- table[order(table$category_value, table$year), ]
+
+# Combining multiple pulls
+df_ARMS_combined_plusRegion <- table_inc_cat %>%
+  rbind(table_inc_netinc) %>% 
+  rbind(table_depr_cat) %>% 
+  rbind(table_lease_cat) %>% 
+  rbind(table_sales) %>% 
+  rbind(table_varexp) %>% 
+  rbind(table_fixedexp)
+
+# Filtering out livestock and focusing on crops
+df_ARMS_expanded <- df_ARMS_combined_plusRegion %>% 
+  filter(category2_value == "Corn" |
+         category2_value == "Soybean" |
+         category2_value == "General Cash Grains" |
+         category2_value == "Other Field Crops" |
+         category2_value == "Wheat" |
+         category2_value == "Specialty Crops (F,V,N)" |
+         category2_value == "Tobacco, Cotton, Peanuts")
+
+colnames(df_ARMS_expanded) <- c("year", "farm_resource_region", "crop", "stat", "estimate")
+```
+
+### State Pull - Iowa
+Pulling by state allows for additional granularity in the data.
+```{r}
+#CROP SALES
+filters_sales <- list(
+    "year" = 1996:2018,
+    "state" = "ia",
+    "report" = "Farm Business Income Statement",
+    "variable" = "icrop",
+    "category" = "Collapsed Farm Typology",
+    "category2" = "spec"
+)
+
+# API POST request
+response <- POST(
+  url = api_endpoints[["survey"]],
+  add_headers("X-Api-Key" = myKey),
+  body = filters_sales,
+  encode = "json",
+  accept_json(),
+  verbose()
+)
+  
+# Transform JSON response into data tables
+response_body <- content(response, "text", encoding = "UTF-8")
+result <- fromJSON(response_body)
+
+# Make table
+table <- as.data.frame( result[["data"]] )
+table <- jsonlite::flatten(table)
+table <- table[, c("year", "category_value", "category2_value", "variable_id", "estimate")]
+table_sales_iowa <- table[order(table$category_value, table$year), ]
+```
+
+
+## Visualizing the difference in data varience
+
+These two visualizations sparked the hypothesis that modeled data and survey data might have very different levels of variability.
+
+```{r}
+df_US_All %>%
+  filter(Financial_Type == "Gross revenue" |
+           Financial_Type == "Gross Margin 1" |
+           Financial_Type == "Gross margin 2" |
+           Financial_Type == "Profit") %>% 
+  ggplot(aes(x=`Result year`,y=Fin_values, color = Financial_Type)) +
+  geom_point() +
+  facet_grid(vars(`Crop level 2`),vars(`Farm name`)) +
+  geom_smooth(se = FALSE) +
+  ggtitle("US Farm Rev & Profits per Hectare Over Time") +
+  ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue()
+```
+
+```{r}
+df_ARMS_expanded %>% 
+  filter(stat == "eftot" |
+           stat == "evtot" |
+           stat == "icrop" |
+           stat == "incfi") %>%
+  filter(crop == "Corn" |
+           crop == "Soybean" |
+           crop == "Wheat") %>%
+  filter(farm_resource_region == "Heartland" |
+           farm_resource_region == "Northern Great Plains" |
+           farm_resource_region == "Prairie Gateway") %>% 
+  ggplot(aes(x=year, y=estimate, col=stat)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    facet_grid(vars(crop), vars(farm_resource_region)) +
+    ggtitle("Key Financial Stats of US Farms (Avg. $ per Farm - ARMS)") +
+    #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue()
+
+```
+
+## Transform agribenchmark to farm-level financials to match ARMS
+
+```{r}
+FarmLevel_Financials <- df_US_All_raw %>% 
+  group_by(`Farm name`, `Result year`) %>% 
+  summarise(Total_Profit = sum(Tot_Profit), #created above by multiplying acreage and Profit/ha
+            Total_Sales = sum(Tot_Sales)) #created above by multiplying acreage and Profit/ha
+
+head(FarmLevel_Financials)
+tail(FarmLevel_Financials)
+```
+
+```{r}
+FarmFin_Wide <-FarmLevel_Financials %>% 
+  group_by(`Farm name`) %>% 
+    summarise(avg = mean(Total_Sales),
+              var = var(Total_Sales),
+              coef_var = sqrt(var)/avg)
+  
+FarmFinLong <-FarmFin_Wide %>% 
+  pivot_longer(c(avg, var, coef_var), names_to = "type", values_to = "value")
+
+#write_csv(FarmFinLong, path = 'df_agribenchmark_Sales_variance.csv')
+```
+
+
+This visualization did not require the transformations above but effectively represents the combinations at the farm level.
+```{r}
+df_US_All_raw %>% 
+  ggplot(aes(x = `Result year`, y = Tot_Sales, fill = `Crop level 2`)) +
+    geom_bar(stat = "identity", position = "stack") +
+    facet_grid( vars(`Farm name`), scales = "free_y") +
+    ggtitle("Total Sales per year by Model Farm and Crop") +
+    #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2007,2019)) +
+    scale_color_hue()
+
+df_US_All_raw %>% 
+  ggplot(aes(x = `Result year`, y = Tot_Profit, fill = `Crop level 2`)) +
+    geom_bar(stat = "identity", position = "stack") +
+    facet_grid( vars(`Farm name`), scales = "free_y") +
+    geom_hline(aes(yintercept = 0)) +
+    ggtitle("Total Profit per year by Model Farm and Crop") +
+    #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2007,2019)) +
+    scale_color_hue()
+```
+
+
+## Quantifying the variance between the datasets - double-click on Corn in Heartland/Iowa
+
+### Creating the necessary subsets of data
+```{r}
+#Analysis pre and post 2007
+
+ARMS_pre2008 <- df_ARMS_expanded %>% 
+  filter(year <= 2007)
+
+ARMS_2008_2018 <- df_ARMS_expanded %>% 
+  filter(year > 2007)
+
+table1 <- ARMS_pre2008 %>% 
+  filter(stat == "icrop") %>%
+  filter(crop == "Corn" |
+           crop == "Soybean" |
+           crop == "Wheat") %>%
+  filter(farm_resource_region == "Heartland" |
+           farm_resource_region == "Northern Great Plains" |
+           farm_resource_region == "Prairie Gateway") %>% 
+  group_by(crop, farm_resource_region) %>% 
+  summarise(avg = mean(estimate),
+            var = var(estimate),
+            coef_var = sqrt(var)/avg,
+            category = "Pre08")
+
+table2 <- ARMS_2008_2018 %>% 
+  filter(stat == "icrop") %>%
+  filter(crop == "Corn" |
+           crop == "Soybean" |
+           crop == "Wheat") %>%
+  filter(farm_resource_region == "Heartland" |
+           farm_resource_region == "Northern Great Plains" |
+           farm_resource_region == "Prairie Gateway") %>% 
+  group_by(crop, farm_resource_region) %>% 
+  summarise(avg = mean(estimate),
+            var = var(estimate),
+            coef_var = sqrt(var)/avg,
+            category = "Post08")
+
+table3 <- df_ARMS_expanded %>% 
+  filter(stat == "icrop") %>%
+  filter(crop == "Corn" |
+           crop == "Soybean" |
+           crop == "Wheat") %>%
+  filter(farm_resource_region == "Heartland" |
+           farm_resource_region == "Northern Great Plains" |
+           farm_resource_region == "Prairie Gateway") %>% 
+  group_by(crop, farm_resource_region) %>% 
+  summarise(avg = mean(estimate),
+            var = var(estimate),
+            coef_var = sqrt(var)/avg,
+            category = "All")
+
+ARMS_Variance_Wide <- table1 %>% 
+  rbind(table2) %>% 
+  rbind(table3)
+
+ARMS_Sales_Variance_long <- ARMS_Variance_Wide %>% 
+  pivot_longer(c(avg, var, coef_var), names_to = "type", values_to = "value")
+```
+
+
+### Combining Agribenchmark & ARMS in Heartland
+
+```{r}
+HeartlandCorn <- ARMS_Sales_Variance_long %>% 
+  filter(crop == "Corn") %>% 
+  filter(farm_resource_region == "Heartland")
+
+Combine1 <- HeartlandCorn %>%   
+  select(category, type, value)
+
+Iowa <- FarmFinLong %>% 
+  filter(`Farm name` == "US700IA") %>% 
+  mutate(crop = "Corn",
+         category = `Farm name`,
+         type1 = type,
+         value1 = value) %>% 
+  select(crop, category, type1, value1)
+
+names(Iowa)[3] <- "type"
+names(Iowa)[4] <- "value"
+  
+df_comparison <- data.frame(Combine1) %>% 
+  rbind(data.frame(Iowa))
+```
+
+### Plotted double-click on IA Variance
+```{r}
+df_comparison %>% 
+  ggplot(aes(x=category, y=value, fill=category)) +
+  geom_bar(stat = "identity", position = "dodge") +
+    facet_grid(vars(type), scales = "free_y") +
+  ggtitle("Comparing Agribenchmark (IA) & ARMS (Heartland Corn)") +
+  #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_color_hue()
+```
+
+
+## Plotting Iowa Sales
+
+```{r}
+table_sales_iowa %>% 
+  filter(category2_value == "Corn" |
+           category2_value == "Soybean") %>% 
+  ggplot(aes(x = year, y = estimate, col = category_value)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    facet_grid(vars(category2_value)) +
+    ggtitle("Sales by Farm Type in Iowa (ARMS")
+```
+
+
+
+
+## Notable Step-change in post-2008 US farm financials
+
+Discussion with Bayer indicated that this was likely due to biofuel mandates.
+
+```{r}
+df_ARMS_expanded %>% 
+  filter(stat == "eftot" |
+           stat == "evtot" |
+           stat == "icrop" |
+           stat == "incfi") %>%
+  filter(crop == "Corn" |
+           crop == "Soybean" |
+           crop == "Wheat") %>%
+  filter(farm_resource_region == "Heartland" |
+           farm_resource_region == "Northern Great Plains" |
+           farm_resource_region == "Prairie Gateway") %>% 
+  ggplot(aes(x=year, y=estimate, col=stat)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    geom_vline(aes(xintercept = 2007), linetype = 2) +
+    facet_grid(vars(crop), vars(farm_resource_region)) +
+    ggtitle("Key Financial Stats of US Farms (Avg. $ per Farm - ARMS") +
+    #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(1996,2018,2), limits = c(1996,2018)) +
+    scale_color_hue()
+
+```
+### Plotting Avg. Sales and Coeff of Variation pre/post 2007 step-change
+```{r}
+ARMS_Sales_Variance_long %>%
+  filter(type == "avg") %>% 
+  ggplot(aes(x = type, y = value, fill = category)) +
+    geom_bar(position = "dodge", stat = "identity") +
+    facet_grid(vars(crop), vars(farm_resource_region)) +
+    ggtitle("Avg. Sales per Farm Pre-08 & 08-18") +
+    #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_color_hue()
+
+ARMS_Sales_Variance_long %>%
+  filter(type == "coef_var") %>% 
+  ggplot(aes(x = type, y = value, fill = category)) +
+    geom_bar(position = "dodge", stat = "identity") +
+    facet_grid(vars(crop), vars(farm_resource_region)) +
+    ggtitle("Coefficient of Variation per Farm Pre-08 & 08-18") +
+    #Bayer pres theme
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_color_hue()
+
+```
+
+
+
+#Ideas for the next ACL Team
+##Fertilizer and pesticide use per hectare by national wealth 
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+
+
+```
+
+##Network Analysis
+*Before runninng this chunk*, make sure to download and unzip the trade matrix data that's available in the following link:
+http://fenixservices.fao.org/faostat/static/bulkdownloads/Trade_DetailedTradeMatrix_E_All_Data_(Normalized).zip
+
+Then paste it in the same folder where the Rmd file is saved.
+We didn't add this table to the shared file because it's very heavy. 
+
+```{r, include=FALSE, message=FALSE, echo=FALSE}
+df_fao_data_trade<-read.csv(file = 'Trade_DetailedTradeMatrix_E_All_Data_(Normalized).csv')
+
+df2<- df_fao_data_trade %>% filter(Item.Code==56, Year==2017, Element.Code==5610)
+nodes <- df2 %>% select(Reporter.Country.Code,Reporter.Countries) %>% group_by(Reporter.Country.Code,Reporter.Countries) %>% count() %>% select(-n) %>% ungroup()
+names(nodes)<-c("id","Country")
+nodes2 <- df2 %>% select(Partner.Country.Code,Partner.Countries) %>% group_by(Partner.Country.Code,Partner.Countries) %>% count() %>% select(-n) %>% ungroup()
+names(nodes2)<-c("id","Country")
+nodes <- rbind(nodes,nodes2)
+nodes <- nodes %>% group_by(id,Country) %>% count() %>% ungroup() %>% select(-n)
+links<-df2 %>% select(Reporter.Country.Code,Partner.Country.Code, Value)
+names(nodes)<-c("id","Country")
+names(links)<-c("from","to","Tonnes")
+
+net<-graph_from_data_frame(d=links, directed=T, vertices = nodes) 
+net<-simplify(net, remove.multiple = F, remove.loops = T)
+adj.matrix<-net[]
+
+deg <- igraph::degree(net, v=V(net),mode="all")
+V(net)$degree <- deg
+
+ggraph(net, layout="linear", circular=T) +
+  geom_node_point(aes(size=degree), color=bayer_cols("light_green")) +
+  geom_node_text(aes(label = Country), size=3.4, color="black", repel = T) +
+  geom_edge_link(color=bayer_cols("light_blue"), width=0.1, alpha=0.1) + 
+  theme_void()
+
+
+
+#US Imports
+
+df2<- df %>% filter(Item.Code==56, Year==2017,  Element.Code==5610, Reporter.Country.Code==231)
+nodes <- df2 %>% select(Reporter.Country.Code,Reporter.Countries, Value) %>% group_by(Reporter.Country.Code,Reporter.Countries) %>% count() %>% select(-n) %>% ungroup()
+names(nodes)<-c("id","Country")
+nodes2 <- df2 %>% select(Partner.Country.Code,Partner.Countries) %>% group_by(Partner.Country.Code,Partner.Countries) %>% count() %>% select(-n) %>% ungroup()
+names(nodes2)<-c("id","Country")
+nodes <- rbind(nodes,nodes2)
+nodes <- nodes %>% group_by(id,Country) %>% count() %>% ungroup() %>% select(-n)
+links<-df2 %>% select(Reporter.Country.Code,Partner.Country.Code, Value)
+names(nodes)<-c("id","Country")
+names(links)<-c("from","to","Tonnes")
+
+aux <- links %>% select(c("to","Tonnes"))
+names(aux)[1]<-c("id")
+nodes <- nodes %>% left_join(aux, by=c('id')) %>% mutate(Tonnes=ifelse(is.na(Tonnes),0,Tonnes))
+
+net<-graph_from_data_frame(d=links, directed=F, vertices = nodes) 
+net<-simplify(net, remove.multiple = F, remove.loops = T)
+adj.matrix<-net[]
+
+ggraph(net, layout="lgl") +
+  geom_edge_fan(color="gray50", width=0.2, alpha=0.5) + 
+  geom_node_point(aes(size=Tonnes), color=bayer_cols("light_green")) +
+  geom_node_text(aes(label = Country), size=5, color="gray50", repel = T) +
+  theme_void()
+
+#US Exports
+
+df2<- df %>% filter(Item.Code==56, Year==2017,  Element.Code==5910, Reporter.Country.Code==231)
+nodes <- df2 %>% select(Reporter.Country.Code,Reporter.Countries, Value) %>% group_by(Reporter.Country.Code,Reporter.Countries) %>% count() %>% select(-n) %>% ungroup()
+names(nodes)<-c("id","Country")
+nodes2 <- df2 %>% select(Partner.Country.Code,Partner.Countries) %>% group_by(Partner.Country.Code,Partner.Countries) %>% count() %>% select(-n) %>% ungroup()
+names(nodes2)<-c("id","Country")
+nodes <- rbind(nodes,nodes2)
+nodes <- nodes %>% group_by(id,Country) %>% count() %>% ungroup() %>% select(-n)
+links<-df2 %>% select(Reporter.Country.Code,Partner.Country.Code, Value)
+names(nodes)<-c("id","Country")
+names(links)<-c("from","to","Tonnes")
+
+aux <- links %>% select(c("to","Tonnes"))
+names(aux)[1]<-c("id")
+nodes <- nodes %>% left_join(aux, by=c('id')) %>% mutate(Tonnes=ifelse(is.na(Tonnes),0,Tonnes))
+
+net<-graph_from_data_frame(d=links, directed=F, vertices = nodes) 
+net<-simplify(net, remove.multiple = F, remove.loops = T)
+adj.matrix<-net[]
+
+ggraph(net, layout="lgl") +
+  geom_edge_fan(color="gray50", width=0.2, alpha=0.5) + 
+  geom_node_point(aes(size=Tonnes), color=bayer_cols("light_green")) +
+  geom_node_text(aes(label = Country), size=5, color="gray50", repel = T) +
+  theme_void()
+
+
+
+```
+
+##NPK application in response to price changes
+Deviations in 2017 may be a result of a revision / update of the US dataset
+This could be an area for comparison with USDA data.
+
+```{r}
+df_US_All_raw %>%
+  filter(`Farm name` == "US1215INC" | `Farm name` == "US1215INS") %>% 
+  ggplot(aes(x = `N-Input`, y = Nitrogen, color = factor(`Result year`))) +
+    geom_point() +
+    #facet_wrap(~`Crop level 2`) +
+    facet_grid(vars(`Crop level 2`),vars(`Farm name`)) +
+    ggtitle("Nitrogen Application & Expenses") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(0,250,50), limits = c(0,250)) +
+    scale_color_hue()
+```
+There is hardly any movement in N-Input amounts; vertical movements are entirely price driven.
+
+```{r}
+df_US_All_raw %>%
+  filter(`Farm name` == "US1215INC" | `Farm name` == "US1215INS") %>% 
+  ggplot(aes(x = `P-Input`, y = Phosphorus, color = factor(`Result year`))) +
+    geom_point() +
+    facet_grid(vars(`Crop level 2`),vars(`Farm name`)) +
+    ggtitle("Phosphorus Application & Expenses") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(0,100,20), limits = c(0,100)) +
+    scale_color_hue()
+```
+2017 saw P application deviate from historical levels: huge increases in corn, prices decreasing.
+
+```{r}
+df_US_All_raw %>%
+  filter(`Farm name` == "US1215INC" | `Farm name` == "US1215INS") %>% 
+  ggplot(aes(x = `K-Input`, y = Potash, color = factor(`Result year`))) +
+    geom_point() +
+    facet_grid(vars(`Crop level 2`),vars(`Farm name`)) +
+    #geom_smooth(aes(group = 1), method = "lm", se = FALSE) +
+    ggtitle("Potash Application & Expenses") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(0,100,20), limits = c(0,100)) +
+    scale_color_hue()
+```
+Limited movement in Input Amounts until 2017.
+
+##Rotation & Tillage
+
+```{r}
+df_US_All_raw %>% 
+  ggplot(aes(x = `Result year`, y = `Gross margin 2`, color = Rotation)) +
+    geom_point() +
+    facet_grid(vars(`Crop level 2`), vars(`Farm name`)) +
+    geom_smooth(se = FALSE) +
+    ggtitle("Rotation analysis by farm and crop") +
+    ggthemes::theme_base(base_size = 10) +
+    theme(axis.text.x = element_text(angle=90)) +
+    scale_x_continuous(breaks=seq(2008,2018,2), limits = c(2008,2018)) +
+    scale_color_hue()
+
+df_US_All_raw %>% 
+  tabyl(`Tillage system`, `Farm name`) %>% 
+  kable()
+```
+## Capital investments following good years
+```{r}
+ARMS_corn <- df_ARMS_expanded %>%
+  pivot_wider(names_from = stat, values_from = estimate) %>%
+  filter(farm_resource_region == "Heartland") %>% 
+  filter(crop == "Corn") %>% 
+  mutate(incfi_lag1 = lag(incfi,1),
+         endepr_lag1 = lag(endepr,1),
+         efrent_lag1 = lag(efrent,1))
+
+ARMS_corn %>% 
+  select(incfi_lag1, endepr, efrent) %>% 
+  corr.test()
+```
+
